@@ -1,9 +1,9 @@
 
-export default function Page() {
+export default function HistoryPage() {
   return (
-    <main>
+    <div>
       History
-    </main>
+    </div>
   )
 }
 
