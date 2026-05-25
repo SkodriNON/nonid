@@ -38,11 +38,17 @@ export default function Providers({
             "/favicon.ico"
         },
 
-        embeddedWallets: {
+      
+embeddedWallets: {
 
-          createOnLogin:
-            "users-without-wallets"
-        }
+  ethereum: {
+
+    createOnLogin:
+      "users-without-wallets"
+  }
+}
+
+
       }}
     >
 
