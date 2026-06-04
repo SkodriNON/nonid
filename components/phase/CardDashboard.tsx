@@ -29,6 +29,9 @@ import {
   clearViewSession
 } from "@/lib/viewSession"
 
+import WalletHoldingsPanel
+from "@/components/phase/WalletHoldingsPanel"
+
 type Tab =
   | "overview"
   | "identity"
@@ -820,6 +823,10 @@ export default function CardDashboard() {
                       {wallet}
                     </p>
                   </div>
+
+                  <WalletHoldingsPanel
+                   wallet={wallet}
+                  />
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <InfoRow label="Balance" value={formattedBalance} accent />
