@@ -3,20 +3,20 @@
 import {
   useEffect,
   useMemo,
-  useState
+  useState,
 } from "react"
 
 import {
   useSearchParams,
-  useRouter
+  useRouter,
 } from "next/navigation"
 
 import {
-  getPupSession
+  getPupSession,
 } from "@/lib/pupSession"
 
 import {
-  ethers
+  ethers,
 } from "ethers"
 
 type Capsule = {
@@ -36,13 +36,12 @@ type Capsule = {
 function StatCard({
   label,
   value,
-  tone = "white"
+  tone = "white",
 }: {
   label: string
   value: string
   tone?: "white" | "cyan" | "yellow" | "red"
 }) {
-
   const color =
     tone === "cyan"
       ? "text-cyan-300"
@@ -68,13 +67,12 @@ function StatCard({
 function InfoRow({
   label,
   value,
-  highlight = false
+  highlight = false,
 }: {
   label: string
   value: string
   highlight?: boolean
 }) {
-
   return (
     <div className="flex justify-between gap-4 rounded-[18px] border border-white/5 bg-black/20 p-4 text-sm">
       <span className="text-zinc-500">
@@ -88,31 +86,44 @@ function InfoRow({
   )
 }
 
-const RPC_URL =
-  process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC_URL ||
-  process.env.ALCHEMY_ARBITRUM_SEPOLIA_RPC!
+async function readJsonSafe(response: Response) {
+  const text =
+    await response.text()
 
-async function getNativeBalance(
-  address: string
-) {
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(
+      text.startsWith("<!DOCTYPE")
+        ? "API returned HTML instead of JSON. Check /api/extension/capsule route."
+        : text || "Invalid JSON response"
+    )
+  }
+}
 
-  const provider =
-    new ethers.providers.JsonRpcProvider(
-      RPC_URL
+async function getNativeBalance(address: string) {
+  const response =
+    await fetch(
+      `/api/wallet/holdings?address=${encodeURIComponent(address)}`,
+      {
+        cache: "no-store",
+      }
     )
 
-  const balance =
-    await provider.getBalance(
-      address
-    )
+  const data =
+    await readJsonSafe(response)
 
-  return ethers.utils.formatEther(
-    balance
-  )
+  if (!response.ok || !data.success) {
+    throw new Error(
+      data.error ||
+      "Could not load wallet balance"
+    )
+  }
+
+  return data?.native?.balance || "0"
 }
 
 export default function IdentityPage() {
-
   const searchParams =
     useSearchParams()
 
@@ -138,25 +149,22 @@ export default function IdentityPage() {
     useState("")
 
   const [walletBalance, setWalletBalance] =
-  useState("0.000000")
+    useState("0.000000")
 
   const formattedBalance =
-  useMemo(() => {
+    useMemo(() => {
+      const value =
+        Number(walletBalance || 0)
 
-    const value =
-      Number(walletBalance || 0)
+      if (Number.isNaN(value)) {
+        return "0.000000"
+      }
 
-    if (Number.isNaN(value)) {
-      return "0.000000"
-    }
-
-    return value.toFixed(6)
-
-  }, [walletBalance])
+      return value.toFixed(6)
+    }, [walletBalance])
 
   const createdAtLabel =
     useMemo(() => {
-
       if (
         !capsule ||
         !capsule.createdAt
@@ -167,7 +175,6 @@ export default function IdentityPage() {
       return new Date(
         capsule.createdAt * 1000
       ).toLocaleString()
-
     }, [capsule])
 
   const privacyLabel =
@@ -186,9 +193,7 @@ export default function IdentityPage() {
       : "Inactive"
 
   async function loadIdentity() {
-
     try {
-
       setLoading(true)
       setError("")
 
@@ -196,13 +201,11 @@ export default function IdentityPage() {
         !capsuleId ||
         Number(capsuleId) <= 0
       ) {
-
         setError(
           "Missing or invalid Capsule ID. Return to Dashboard and open identity again."
         )
 
         setLoading(false)
-
         return
       }
 
@@ -214,23 +217,31 @@ export default function IdentityPage() {
         !pupSession.active ||
         pupSession.capsuleId !== capsuleId
       ) {
-
         setError(
           "Local PUP session required before opening Identity."
         )
 
         setLoading(false)
-
         return
       }
 
       const response =
         await fetch(
-          `/api/extension/capsule?capsuleId=${capsuleId}`
+          `/api/extension/capsule?capsuleId=${encodeURIComponent(capsuleId)}`,
+          {
+            cache: "no-store",
+          }
         )
 
       const data =
-        await response.json()
+        await readJsonSafe(response)
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+          `HTTP ${response.status}`
+        )
+      }
 
       if (!data.success) {
         throw new Error(
@@ -239,57 +250,42 @@ export default function IdentityPage() {
         )
       }
 
-      setCapsule(
-  data.capsule
-)
+      setCapsule(data.capsule)
 
-if (wallet) {
+      if (
+        wallet &&
+        ethers.utils.isAddress(wallet)
+      ) {
+        const realBalance =
+          await getNativeBalance(wallet)
 
-  const realBalance =
-    await getNativeBalance(
-      wallet
-    )
-
-  setWalletBalance(
-    realBalance
-  )
-}
-
+        setWalletBalance(realBalance)
+      }
     } catch (err: any) {
-
       setError(
         err?.message ||
         "Failed to load identity"
       )
-
     } finally {
-
       setLoading(false)
     }
   }
 
   useEffect(() => {
-
     loadIdentity()
-
   }, [capsuleId])
 
   return (
     <main className="min-h-screen overflow-hidden bg-black px-4 py-6 text-white sm:px-6 lg:px-8">
-
       <div className="pointer-events-none fixed inset-0 opacity-60">
         <div className="absolute left-1/2 top-[-20%] h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-cyan-400/10 blur-[120px]" />
         <div className="absolute bottom-[-20%] right-[-10%] h-[420px] w-[420px] rounded-full bg-purple-500/10 blur-[120px]" />
       </div>
 
       <section className="relative mx-auto max-w-[1180px]">
-
         <div className="mb-5 rounded-[30px] border border-white/10 bg-white/[0.025] p-5">
-
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-
             <div>
-
               <p className="text-xs font-black tracking-[0.35em] text-cyan-300">
                 NEXUSNON.ID
               </p>
@@ -301,11 +297,9 @@ if (wallet) {
               <p className="mt-2 max-w-[760px] text-sm leading-6 text-zinc-400">
                 Capsule = Identity · PUP = Session · Contract = Source of Truth.
               </p>
-
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row">
-
               <button
                 type="button"
                 onClick={loadIdentity}
@@ -325,41 +319,28 @@ if (wallet) {
               >
                 Dashboard
               </button>
-
             </div>
-
           </div>
-
         </div>
 
         {loading && (
-
           <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-6 text-zinc-400">
             Loading identity from contract...
           </div>
-
         )}
 
         {error && (
-
           <div className="rounded-[30px] border border-red-500/20 bg-red-500/10 p-6 text-red-300">
             {error}
           </div>
-
         )}
 
         {capsule && (
-
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-
             <section className="space-y-5">
-
               <div className="rounded-[34px] border border-cyan-400/10 bg-[#050816]/90 p-5 shadow-[0_0_100px_rgba(0,255,255,0.08)] backdrop-blur">
-
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-
                   <div>
-
                     <p className="text-xs font-black tracking-[0.28em] text-cyan-300">
                       IDENTITY CAPSULE
                     </p>
@@ -371,17 +352,14 @@ if (wallet) {
                     <p className="mt-2 text-sm text-zinc-400">
                       Capsule #{capsule.capsuleId}
                     </p>
-
                   </div>
 
                   <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-300">
                     {statusLabel}
                   </div>
-
                 </div>
 
                 <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-
                   <StatCard
                     label="Capsule"
                     value={statusLabel}
@@ -394,9 +372,9 @@ if (wallet) {
                   />
 
                   <StatCard
-                    label="Balance"
+                    label="Wallet Gas"
                     value={`${formattedBalance} ETH`}
-                    tone={capsule.balance > 0 ? "cyan" : "yellow"}
+                    tone={Number(formattedBalance) > 0 ? "cyan" : "yellow"}
                   />
 
                   <StatCard
@@ -404,13 +382,10 @@ if (wallet) {
                     value={sessionLabel}
                     tone={capsule.sessionActive ? "cyan" : "yellow"}
                   />
-
                 </div>
-
               </div>
 
               <div className="rounded-[30px] border border-cyan-400/10 bg-cyan-400/[0.035] p-5">
-
                 <p className="text-xs font-black tracking-[0.28em] text-cyan-300">
                   SOURCE OF TRUTH
                 </p>
@@ -419,17 +394,14 @@ if (wallet) {
                   The Capsule NFT is the sovereign identity source inside NexusNON.ID.
                   Identity is verified through the Genesis smart contract. Browser storage and databases are not identity authorities.
                 </p>
-
               </div>
 
               <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-5">
-
                 <p className="text-xs font-black tracking-[0.28em] text-cyan-300">
                   PRIVACY SYNC
                 </p>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
-
                   <StatCard
                     label="Communication"
                     value={capsule.communication ? "Enabled" : "Disabled"}
@@ -444,13 +416,10 @@ if (wallet) {
                     label="Marketing"
                     value={capsule.marketing ? "Enabled" : "Disabled"}
                   />
-
                 </div>
-
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-
                 <button
                   type="button"
                   onClick={() =>
@@ -473,15 +442,11 @@ if (wallet) {
                 >
                   Back to Dashboard
                 </button>
-
               </div>
-
             </section>
 
             <aside className="space-y-5">
-
               <div className="rounded-[30px] border border-white/10 bg-white/[0.035] p-5">
-
                 <p className="text-xs font-black tracking-[0.28em] text-cyan-300">
                   CAPSULE WALLET
                 </p>
@@ -491,7 +456,6 @@ if (wallet) {
                 </p>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-
                   <button
                     type="button"
                     onClick={() =>
@@ -510,13 +474,10 @@ if (wallet) {
                   >
                     Refresh
                   </button>
-
                 </div>
-
               </div>
 
               <div className="rounded-[30px] border border-cyan-400/20 bg-cyan-400/[0.04] p-5">
-
                 <p className="text-xs font-black tracking-[0.28em] text-cyan-300">
                   PUP PASSPORT
                 </p>
@@ -526,7 +487,6 @@ if (wallet) {
                 </p>
 
                 <div className="mt-4 grid gap-3">
-
                   <InfoRow
                     label="Passport Layer"
                     value="Active"
@@ -548,19 +508,15 @@ if (wallet) {
                     label="Role"
                     value="Sovereign Citizen"
                   />
-
                 </div>
-
               </div>
 
               <div className="rounded-[30px] border border-cyan-400/10 bg-cyan-400/[0.03] p-5">
-
                 <p className="text-xs font-black tracking-[0.28em] text-cyan-300">
                   IDENTITY SECURITY
                 </p>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-
                   <InfoRow
                     label="Anti-Phishing"
                     value="Configured"
@@ -584,19 +540,15 @@ if (wallet) {
                     value="Protected"
                     highlight
                   />
-
                 </div>
-
               </div>
 
               <div className="rounded-[30px] border border-white/10 bg-white/[0.035] p-5">
-
                 <p className="text-xs font-black tracking-[0.28em] text-cyan-300">
                   TECHNICAL DETAILS
                 </p>
 
                 <div className="mt-4 grid gap-3">
-
                   <InfoRow
                     label="Network"
                     value="Arbitrum Sepolia"
@@ -622,19 +574,12 @@ if (wallet) {
                     value="Genesis Contract"
                     highlight
                   />
-
                 </div>
-
               </div>
-
             </aside>
-
           </div>
-
         )}
-
       </section>
-
     </main>
   )
 }

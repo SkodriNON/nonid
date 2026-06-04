@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic"
 const CHAIN_ID = 421614
 const NETWORK = "Arbitrum Sepolia"
 
-const RPC_URL = process.env.ALCHEMY_ARBITRUM_SEPOLIA_RPC
-const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY
+const RPC_URL = process.env.ALCHEMY_ARBITRUM_SEPOLIA_RPC || ""
+const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY || ""
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json(
@@ -17,6 +17,20 @@ function jsonError(message: string, status = 400) {
     },
     { status }
   )
+}
+
+async function safeJson(res: Response) {
+  const text = await res.text()
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(
+      text?.startsWith("<!DOCTYPE")
+        ? "Alchemy/API returned HTML instead of JSON"
+        : text || "Invalid JSON response"
+    )
+  }
 }
 
 function formatHexBalance(hexBalance: string, decimals: number) {
@@ -51,7 +65,11 @@ async function rpcCall(method: string, params: unknown[]) {
     }),
   })
 
-  const data = await res.json()
+  const data = await safeJson(res)
+
+  if (!res.ok) {
+    throw new Error(`Alchemy RPC HTTP ${res.status}`)
+  }
 
   if (data?.error) {
     throw new Error(data.error.message || "Alchemy RPC error")
@@ -83,7 +101,11 @@ async function getNftsForOwner(wallet: string) {
       cache: "no-store",
     })
 
-    const data = await res.json()
+    const data = await safeJson(res)
+
+    if (!res.ok) {
+      throw new Error(`Alchemy NFT HTTP ${res.status}`)
+    }
 
     if (data?.error) {
       throw new Error(data.error.message || "Alchemy NFT API error")
@@ -140,6 +162,7 @@ export async function GET(req: NextRequest) {
         if (!token?.contractAddress) return false
         if (!ethers.utils.isAddress(token.contractAddress)) return false
         if (!token?.tokenBalance) return false
+
         return !ethers.BigNumber.from(token.tokenBalance).isZero()
       } catch {
         return false
