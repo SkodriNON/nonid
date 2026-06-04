@@ -123,23 +123,25 @@ export async function GET(
       )
     }
 
-    const rpcUrl =
-      getEnv([
-        "ARBITRUM_SEPOLIA_RPC_URL",
-        "NETWORK_RPC",
-        "NEXT_PUBLIC_RPC_URL",
-        "NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC",
-        "NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC_URL",
-        "NEXT_PUBLIC_ARBITRUM_RPC"
-      ])
-
+    const rpcUrls = [
+  getEnv([
+    "ARBITRUM_SEPOLIA_RPC_URL",
+    "NETWORK_RPC",
+    "NEXT_PUBLIC_RPC_URL",
+    "NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC",
+    "NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC_URL",
+    "NEXT_PUBLIC_ARBITRUM_RPC"
+  ]),
+  "https://sepolia-rollup.arbitrum.io/rpc",
+  "https://arbitrum-sepolia.drpc.org"
+].filter(Boolean)
     const arbiscanKey =
       getEnv([
         "ARBISCAN_API_KEY",
         "ETHERSCAN_API_KEY"
       ])
 
-    if (!rpcUrl) {
+    if (rpcUrls.length === 0) {
       return json(
         {
           success: false,
@@ -161,16 +163,57 @@ export async function GET(
       )
     }
 
-    const provider =
-  new ethers.providers.StaticJsonRpcProvider(
-    rpcUrl,
-    421614
-  )
+    let provider:
+  ethers.providers.StaticJsonRpcProvider | null =
+    null
 
-    const nativeWei =
-      await provider.getBalance(
+let nativeWei:
+  ethers.BigNumber | null =
+    null
+
+let lastRpcError = ""
+
+for (const url of rpcUrls) {
+  try {
+    const candidate =
+      new ethers.providers.StaticJsonRpcProvider(
+        url,
+        421614
+      )
+
+    const balance =
+      await candidate.getBalance(
         wallet
       )
+
+    provider =
+      candidate
+
+    nativeWei =
+      balance
+
+    break
+  } catch (err: any) {
+    lastRpcError =
+      err?.message ||
+      "RPC_FAILED"
+  }
+}
+
+if (
+  !provider ||
+  !nativeWei
+) {
+  return json(
+    {
+      success: false,
+      error:
+        lastRpcError ||
+        "ALL_RPC_PROVIDERS_FAILED"
+    },
+    500
+  )
+}
 
     const native = {
       type:
