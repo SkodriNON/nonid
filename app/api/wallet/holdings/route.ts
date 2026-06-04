@@ -8,7 +8,6 @@ const NETWORK = "Arbitrum Sepolia"
 
 const RPC_URL =
   process.env.ALCHEMY_ARBITRUM_SEPOLIA_RPC ||
-  process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC_URL ||
   "https://sepolia-rollup.arbitrum.io/rpc"
 
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY
@@ -26,6 +25,7 @@ function jsonError(message: string, status = 400) {
 function formatHexBalance(hexBalance: string, decimals: number) {
   try {
     if (!hexBalance || hexBalance === "0x") return "0"
+
     return ethers.utils.formatUnits(
       ethers.BigNumber.from(hexBalance),
       decimals
@@ -35,7 +35,7 @@ function formatHexBalance(hexBalance: string, decimals: number) {
   }
 }
 
-async function alchemyRpc(method: string, params: unknown[]) {
+async function rpcCall(method: string, params: unknown[]) {
   const res = await fetch(RPC_URL, {
     method: "POST",
     cache: "no-store",
@@ -53,7 +53,7 @@ async function alchemyRpc(method: string, params: unknown[]) {
   const data = await res.json()
 
   if (data?.error) {
-    throw new Error(data.error.message || "Alchemy RPC error")
+    throw new Error(data.error.message || "RPC error")
   }
 
   return data.result
@@ -102,15 +102,11 @@ export async function GET(req: NextRequest) {
       return jsonError("Invalid wallet address")
     }
 
-    const provider = new ethers.providers.StaticJsonRpcProvider(
-  RPC_URL,
-  {
-    chainId: CHAIN_ID,
-    name: "arbitrum-sepolia",
-  }
-)
-
-    const nativeRaw = await provider.getBalance(wallet)
+    const nativeHex =
+      await rpcCall("eth_getBalance", [
+        wallet,
+        "latest",
+      ])
 
     const native = {
       type: "native",
@@ -118,71 +114,82 @@ export async function GET(req: NextRequest) {
       symbol: "ETH",
       contractAddress: "native",
       decimals: 18,
-      rawBalance: nativeRaw.toString(),
-      balance: ethers.utils.formatEther(nativeRaw),
+      rawBalance: ethers.BigNumber.from(nativeHex).toString(),
+      balance: ethers.utils.formatEther(
+        ethers.BigNumber.from(nativeHex)
+      ),
     }
 
-    const tokenBalances = await alchemyRpc("alchemy_getTokenBalances", [
-      wallet,
-      "erc20",
-    ])
+    let tokenRows: any[] = []
 
-    const tokenBalanceRows: any[] = Array.isArray(tokenBalances?.tokenBalances)
-      ? tokenBalances.tokenBalances
-      : []
+    try {
+      const tokenBalances =
+        await rpcCall("alchemy_getTokenBalances", [
+          wallet,
+          "erc20",
+        ])
 
-    const nonZeroTokenRows = tokenBalanceRows.filter((token) => {
-      try {
-        if (!token?.contractAddress) return false
-        if (!ethers.utils.isAddress(token.contractAddress)) return false
-        if (!token?.tokenBalance) return false
+      tokenRows = Array.isArray(tokenBalances?.tokenBalances)
+        ? tokenBalances.tokenBalances
+        : []
+    } catch {
+      tokenRows = []
+    }
 
-        return !ethers.BigNumber.from(token.tokenBalance).isZero()
-      } catch {
-        return false
-      }
-    })
-
-    const tokens = await Promise.all(
-      nonZeroTokenRows.slice(0, 200).map(async (token) => {
+    const nonZeroTokenRows =
+      tokenRows.filter((token) => {
         try {
-          const contractAddress = token.contractAddress
+          if (!token?.contractAddress) return false
+          if (!ethers.utils.isAddress(token.contractAddress)) return false
+          if (!token?.tokenBalance) return false
 
-          const metadata = await alchemyRpc("alchemy_getTokenMetadata", [
-            contractAddress,
-          ])
-
-          const decimals = Number(metadata?.decimals ?? 18)
-
-          return {
-            type: "erc20",
-            name: metadata?.name || "Unknown Token",
-            symbol: metadata?.symbol || "TOKEN",
-            contractAddress,
-            decimals,
-            rawBalance: ethers.BigNumber.from(token.tokenBalance).toString(),
-            balance: formatHexBalance(token.tokenBalance, decimals),
-            logo: metadata?.logo || null,
-          }
+          return !ethers.BigNumber.from(token.tokenBalance).isZero()
         } catch {
-          return null
+          return false
         }
       })
-    )
 
-    const cleanTokens = tokens.filter(Boolean)
+    const tokens =
+      await Promise.all(
+        nonZeroTokenRows.slice(0, 200).map(async (token) => {
+          try {
+            const metadata =
+              await rpcCall("alchemy_getTokenMetadata", [
+                token.contractAddress,
+              ])
 
-    const nftsRaw = await getNftsForOwner(wallet)
+            const decimals =
+              Number(metadata?.decimals ?? 18)
 
-    const nfts = nftsRaw.map((nft: any) => {
-      const image =
-        nft?.image?.cachedUrl ||
-        nft?.image?.pngUrl ||
-        nft?.image?.thumbnailUrl ||
-        nft?.raw?.metadata?.image ||
-        null
+            return {
+              type: "erc20",
+              name: metadata?.name || "Unknown Token",
+              symbol: metadata?.symbol || "TOKEN",
+              contractAddress: token.contractAddress,
+              decimals,
+              rawBalance: ethers.BigNumber.from(
+                token.tokenBalance
+              ).toString(),
+              balance: formatHexBalance(
+                token.tokenBalance,
+                decimals
+              ),
+              logo: metadata?.logo || null,
+            }
+          } catch {
+            return null
+          }
+        })
+      )
 
-      return {
+    const cleanTokens =
+      tokens.filter(Boolean)
+
+    const nftsRaw =
+      await getNftsForOwner(wallet)
+
+    const nfts =
+      nftsRaw.map((nft: any) => ({
         type: "nft",
         standard: nft?.tokenType || "NFT",
         name:
@@ -194,12 +201,20 @@ export async function GET(req: NextRequest) {
         contractAddress: nft?.contract?.address || null,
         tokenId: nft?.tokenId || null,
         balance: nft?.balance || "1",
-        image,
+        image:
+          nft?.image?.cachedUrl ||
+          nft?.image?.pngUrl ||
+          nft?.image?.thumbnailUrl ||
+          nft?.raw?.metadata?.image ||
+          null,
         collectionName: nft?.contract?.name || null,
-      }
-    })
+      }))
 
-    const holdings = [native, ...cleanTokens, ...nfts]
+    const holdings = [
+      native,
+      ...cleanTokens,
+      ...nfts,
+    ]
 
     return NextResponse.json({
       success: true,
@@ -213,7 +228,7 @@ export async function GET(req: NextRequest) {
       visibleHoldingCount: holdings.length,
       erc20Count: cleanTokens.length,
       nftCount: nfts.length,
-      source: "Alchemy Universal Holdings",
+      source: "Universal JSON-RPC + Alchemy NFT",
     })
   } catch (error) {
     return NextResponse.json(
