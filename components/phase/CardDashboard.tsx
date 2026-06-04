@@ -824,11 +824,7 @@ export default function CardDashboard() {
                     </p>
                   </div>
 
-                 {/* 
-                <WalletHoldingsPanel
-                 wallet={wallet}
-                />
-                 */}
+                 <WalletHoldingsPanel address={walletAddress} />
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <InfoRow label="Balance" value={formattedBalance} accent />

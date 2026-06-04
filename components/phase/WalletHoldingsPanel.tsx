@@ -1,123 +1,47 @@
 "use client"
 
-import {
-  useEffect,
-  useState
-} from "react"
+import { useEffect, useState } from "react"
 
 type Holding = {
   type: "native" | "erc20"
+  chainId: string
   name: string
   symbol: string
-  contractAddress: string
   decimals: number
+  contractAddress: string | null
   rawBalance: string
   balance: string
 }
 
-function shortAddress(
-  address: string
-) {
-  if (
-    !address ||
-    address === "native"
-  ) {
-    return address
-  }
-
-  return `${address.slice(0, 6)}...${address.slice(-4)}`
-}
-
-function formatBalance(
-  value: string
-) {
-  const num =
-    Number(value)
-
-  if (!Number.isFinite(num)) {
-    return value
-  }
-
-  if (num === 0) {
-    return "0"
-  }
-
-  if (num < 0.000001) {
-    return "<0.000001"
-  }
-
-  return num.toLocaleString(
-    undefined,
-    {
-      maximumFractionDigits:
-        6
-    }
-  )
-}
-
 export default function WalletHoldingsPanel({
-  wallet
+  address,
 }: {
-  wallet: string
+  address?: string | null
 }) {
-  const [loading, setLoading] =
-    useState(false)
-
-  const [error, setError] =
-    useState("")
-
-  const [holdings, setHoldings] =
-    useState<Holding[]>([])
+  const [holdings, setHoldings] = useState<Holding[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function loadHoldings() {
+    if (!address) return
+
+    setLoading(true)
+    setError(null)
+
     try {
-      setLoading(true)
-      setError("")
+      const res = await fetch(`/api/wallet/holdings?address=${address}`, {
+        cache: "no-store",
+      })
 
-      if (
-        !wallet ||
-        !/^0x[a-fA-F0-9]{40}$/.test(wallet)
-      ) {
-        setHoldings([])
-        setError(
-          "Capsule Wallet missing."
-        )
-        return
+      const data = await res.json()
+
+      if (!data.ok) {
+        throw new Error(data.error || "Could not load holdings")
       }
 
-      const response =
-        await fetch(
-          `/api/wallet/holdings?wallet=${encodeURIComponent(
-            wallet
-          )}`,
-          {
-            cache:
-              "no-store"
-          }
-        )
-
-      const data =
-        await response.json()
-
-      if (
-        !response.ok ||
-        data.success !== true
-      ) {
-        throw new Error(
-          data.error ||
-          "Could not load wallet holdings."
-        )
-      }
-
-      setHoldings(
-        data.holdings || []
-      )
-
-    } catch (err: any) {
-      setError(
-        err?.message ||
-        "Wallet holdings failed."
-      )
+      setHoldings(data.holdings || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error")
     } finally {
       setLoading(false)
     }
@@ -125,178 +49,77 @@ export default function WalletHoldingsPanel({
 
   useEffect(() => {
     loadHoldings()
-  }, [wallet])
+  }, [address])
+
+  if (!address) return null
 
   return (
-    <div className="
-      mt-6
-      rounded-[28px]
-      border
-      border-white/10
-      bg-white/[0.035]
-      p-5
-    ">
-      <div className="
-        flex
-        flex-col
-        gap-3
-        sm:flex-row
-        sm:items-center
-        sm:justify-between
-      ">
+    <section className="rounded-[32px] border border-white/10 bg-white/[0.04] p-6 shadow-[0_0_60px_rgba(0,255,255,0.08)] backdrop-blur-xl">
+      <div className="mb-5 flex items-center justify-between gap-4">
         <div>
-          <p className="
-            text-xs
-            font-black
-            uppercase
-            tracking-[0.25em]
-            text-cyan-300
-          ">
+          <p className="text-xs uppercase tracking-[0.3em] text-cyan-300/70">
             Universal Wallet Holdings
           </p>
-
-          <p className="
-            mt-2
-            text-xs
-            text-zinc-500
-          ">
-            Reads native gas balance and every ERC20 token discovered through Arbiscan transfer history.
-          </p>
+          <h2 className="mt-2 text-2xl font-semibold text-white">
+            Native + ERC20 Assets
+          </h2>
         </div>
 
         <button
-          type="button"
           onClick={loadHoldings}
           disabled={loading}
-          className="
-            h-11
-            rounded-xl
-            border
-            border-cyan-400/20
-            bg-cyan-400/10
-            px-4
-            text-xs
-            font-black
-            text-cyan-200
-            disabled:opacity-50
-          "
+          className="rounded-2xl border border-cyan-300/20 px-4 py-2 text-sm text-cyan-100 transition hover:bg-cyan-300/10 disabled:opacity-50"
         >
-          {loading
-            ? "Refreshing..."
-            : "Refresh Holdings"}
+          {loading ? "Scanning..." : "Refresh"}
         </button>
       </div>
 
       {error && (
-        <div className="
-          mt-4
-          rounded-2xl
-          border
-          border-red-400/20
-          bg-red-400/10
-          px-4
-          py-3
-          text-sm
-          text-red-200
-        ">
+        <div className="mb-4 rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200">
           {error}
         </div>
       )}
 
-      <div className="
-        mt-5
-        grid
-        gap-3
-      ">
+      <div className="space-y-3">
         {holdings.length === 0 && !loading ? (
-          <div className="
-            rounded-2xl
-            border
-            border-white/10
-            bg-black/20
-            px-4
-            py-5
-            text-sm
-            text-zinc-500
-          ">
-            No wallet holdings found yet.
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/60">
+            No holdings detected yet.
           </div>
         ) : (
           holdings.map((item) => (
             <div
-              key={`${item.type}-${item.contractAddress}`}
-              className="
-                rounded-2xl
-                border
-                border-white/10
-                bg-black/25
-                p-4
-              "
+              key={`${item.type}-${item.contractAddress || "native"}`}
+              className="rounded-2xl border border-white/10 bg-black/20 p-4"
             >
-              <div className="
-                flex
-                items-start
-                justify-between
-                gap-4
-              ">
+              <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="
-                    text-sm
-                    font-black
-                    text-white
-                  ">
+                  <p className="text-base font-semibold text-white">
                     {item.symbol}
                   </p>
-
-                  <p className="
-                    mt-1
-                    text-xs
-                    text-zinc-500
-                  ">
-                    {item.name}
-                  </p>
-
-                  <p className="
-                    mt-2
-                    text-[11px]
-                    text-zinc-600
-                  ">
-                    {item.type === "native"
-                      ? "Native Gas Asset"
-                      : shortAddress(
-                          item.contractAddress
-                        )}
-                  </p>
+                  <p className="text-sm text-white/50">{item.name}</p>
                 </div>
 
-                <div className="
-                  text-right
-                ">
-                  <p className="
-                    text-lg
-                    font-black
-                    text-cyan-100
-                  ">
-                    {formatBalance(
-                      item.balance
-                    )}
+                <div className="text-right">
+                  <p className="text-lg font-semibold text-cyan-100">
+                    {Number(item.balance).toLocaleString(undefined, {
+                      maximumFractionDigits: 6,
+                    })}
                   </p>
-
-                  <p className="
-                    mt-1
-                    text-[11px]
-                    uppercase
-                    tracking-[0.16em]
-                    text-zinc-500
-                  ">
+                  <p className="text-xs uppercase tracking-[0.2em] text-white/40">
                     {item.type}
                   </p>
                 </div>
               </div>
+
+              {item.contractAddress && (
+                <p className="mt-3 break-all text-xs text-white/35">
+                  {item.contractAddress}
+                </p>
+              )}
             </div>
           ))
         )}
       </div>
-    </div>
+    </section>
   )
 }

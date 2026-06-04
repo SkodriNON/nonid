@@ -1,217 +1,135 @@
-export const runtime =
-  "nodejs"
+import { NextRequest, NextResponse } from "next/server"
+import { ethers } from "ethers"
 
-export const dynamic =
-  "force-dynamic"
+export const dynamic = "force-dynamic"
 
-function getEnv(names: string[]) {
-  for (const name of names) {
-    const value = process.env[name]
+const CHAIN_ID = process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_CHAIN_ID || "421614"
+const RPC_URL = process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC_URL
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY
 
-    if (value && value.trim() !== "") {
-      return value.trim()
-    }
-  }
+const ERC20_ABI = [
+  "function balanceOf(address owner) view returns (uint256)",
+  "function decimals() view returns (uint8)",
+  "function symbol() view returns (string)",
+  "function name() view returns (string)",
+]
 
-  return ""
+type TokenTransfer = {
+  contractAddress: string
+  tokenName?: string
+  tokenSymbol?: string
+  tokenDecimal?: string
 }
 
-function json(data: any, status = 200) {
-  return Response.json(data, { status })
+function bad(message: string, status = 400) {
+  return NextResponse.json({ ok: false, error: message }, { status })
 }
 
-function short(value: string) {
-  if (!value) return ""
-  return `${value.slice(0, 6)}...${value.slice(-4)}`
-}
-
-function formatUnits(raw: string, decimals: number) {
-  const clean = String(raw || "0")
-  const dec = Number.isFinite(decimals) ? decimals : 18
-
-  if (!/^\d+$/.test(clean)) return "0"
-  if (dec <= 0) return clean
-
-  const padded = clean.padStart(dec + 1, "0")
-  const whole = padded.slice(0, -dec)
-  const fraction = padded.slice(-dec).replace(/0+$/, "")
-
-  return fraction ? `${whole}.${fraction}` : whole
-}
-
-async function etherscanV2(params: Record<string, string>) {
-  const key =
-    getEnv([
-      "ETHERSCAN_API_KEY",
-      "ARBISCAN_API_KEY"
-    ])
-
-  if (!key) {
-    throw new Error("ETHERSCAN_API_KEY_MISSING")
-  }
-
-  const url =
-    new URL("https://api.etherscan.io/v2/api")
-
-  url.searchParams.set("chainid", "421614")
-
-  for (const [k, v] of Object.entries(params)) {
-    url.searchParams.set(k, v)
-  }
-
-  url.searchParams.set("apikey", key)
-
-  const response =
-    await fetch(url.toString(), {
-      cache: "no-store"
-    })
-
-  const data =
-    await response.json()
-
-  if (
-    data.status === "0" &&
-    data.message !== "No transactions found"
-  ) {
-    throw new Error(
-      String(data.result || data.message || "ETHERSCAN_V2_ERROR")
-    )
-  }
-
-  return data.result
-}
-
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
-    const url =
-      new URL(req.url)
+    const address = req.nextUrl.searchParams.get("address")
 
-    const wallet =
-      String(url.searchParams.get("wallet") || "").trim()
-
-    if (
-      !wallet ||
-      !/^0x[a-fA-F0-9]{40}$/.test(wallet)
-    ) {
-      return json(
-        {
-          success: false,
-          error: "INVALID_WALLET"
-        },
-        400
-      )
+    if (!address || !ethers.isAddress(address)) {
+      return bad("Invalid wallet address")
     }
 
-    const nativeRaw =
-      await etherscanV2({
-        module: "account",
-        action: "balance",
-        address: wallet,
-        tag: "latest"
-      })
+    if (!RPC_URL) {
+      return bad("Missing NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC_URL", 500)
+    }
+
+    const provider = new ethers.JsonRpcProvider(RPC_URL)
+
+    const nativeWei = await provider.getBalance(address)
 
     const native = {
       type: "native",
-      name: "Arbitrum Sepolia Native Gas",
+      chainId: CHAIN_ID,
+      name: "Arbitrum Sepolia Ether",
       symbol: "ETH",
-      contractAddress: "native",
       decimals: 18,
-      rawBalance: String(nativeRaw || "0"),
-      balance: formatUnits(String(nativeRaw || "0"), 18)
+      contractAddress: null,
+      rawBalance: nativeWei.toString(),
+      balance: ethers.formatEther(nativeWei),
     }
 
-    const transfers =
-      await etherscanV2({
-        module: "account",
-        action: "tokentx",
-        address: wallet,
-        startblock: "0",
-        endblock: "999999999",
-        sort: "desc"
+    let transfers: TokenTransfer[] = []
+
+    if (ETHERSCAN_API_KEY) {
+      const url = new URL("https://api.etherscan.io/v2/api")
+      url.searchParams.set("chainid", CHAIN_ID)
+      url.searchParams.set("module", "account")
+      url.searchParams.set("action", "tokentx")
+      url.searchParams.set("address", address)
+      url.searchParams.set("page", "1")
+      url.searchParams.set("offset", "100")
+      url.searchParams.set("sort", "desc")
+      url.searchParams.set("apikey", ETHERSCAN_API_KEY)
+
+      const res = await fetch(url.toString(), {
+        cache: "no-store",
       })
 
-    const tokenMap =
-      new Map<string, any>()
+      const data = await res.json()
 
-    if (Array.isArray(transfers)) {
-      for (const tx of transfers) {
-        const tokenAddress =
-          String(tx.contractAddress || "").toLowerCase()
-
-        if (
-          !tokenAddress ||
-          !/^0x[a-fA-F0-9]{40}$/.test(tokenAddress)
-        ) {
-          continue
-        }
-
-        if (!tokenMap.has(tokenAddress)) {
-          tokenMap.set(tokenAddress, {
-            type: "erc20",
-            name: tx.tokenName || "Unknown Token",
-            symbol: tx.tokenSymbol || short(tokenAddress),
-            contractAddress: tokenAddress,
-            decimals: Number(tx.tokenDecimal || 18),
-            rawBalance: "0",
-            balance: "0"
-          })
-        }
+      if (data?.status === "1" && Array.isArray(data.result)) {
+        transfers = data.result
       }
     }
 
-    const tokens: any[] =
-      []
+    const uniqueContracts = Array.from(
+      new Map(
+        transfers
+          .filter((t) => t.contractAddress && ethers.isAddress(t.contractAddress))
+          .map((t) => [t.contractAddress.toLowerCase(), t])
+      ).values()
+    )
 
-    for (const token of tokenMap.values()) {
+    const erc20 = []
+
+    for (const token of uniqueContracts.slice(0, 30)) {
       try {
-        const raw =
-          await etherscanV2({
-            module: "account",
-            action: "tokenbalance",
-            contractaddress: token.contractAddress,
-            address: wallet,
-            tag: "latest"
+        const contract = new ethers.Contract(token.contractAddress, ERC20_ABI, provider)
+
+        const [rawBalance, decimalsRaw, symbolRaw, nameRaw] = await Promise.all([
+          contract.balanceOf(address),
+          contract.decimals().catch(() => Number(token.tokenDecimal || 18)),
+          contract.symbol().catch(() => token.tokenSymbol || "TOKEN"),
+          contract.name().catch(() => token.tokenName || "Unknown Token"),
+        ])
+
+        const decimals = Number(decimalsRaw)
+
+        if (rawBalance > 0n) {
+          erc20.push({
+            type: "erc20",
+            chainId: CHAIN_ID,
+            name: String(nameRaw),
+            symbol: String(symbolRaw),
+            decimals,
+            contractAddress: token.contractAddress,
+            rawBalance: rawBalance.toString(),
+            balance: ethers.formatUnits(rawBalance, decimals),
           })
-
-        const rawString =
-          String(raw || "0")
-
-        if (rawString === "0") {
-          continue
         }
-
-        tokens.push({
-          ...token,
-          rawBalance: rawString,
-          balance: formatUnits(rawString, token.decimals)
-        })
-      } catch {}
+      } catch {
+        continue
+      }
     }
 
-    return json({
-      success: true,
-      wallet,
-      chainId: 421614,
-      network: "Arbitrum Sepolia",
-      native,
-      tokens,
-      holdings: [
-        native,
-        ...tokens
-      ],
-      discoveredTokenCount: tokenMap.size,
-      visibleHoldingCount: tokens.length + 1
+    return NextResponse.json({
+      ok: true,
+      address,
+      chainId: CHAIN_ID,
+      holdings: [native, ...erc20],
+      source: "rpc + etherscan-v2-token-transfers",
     })
-
-  } catch (err: any) {
-    return json(
+  } catch (error) {
+    return NextResponse.json(
       {
-        success: false,
-        error:
-          err?.message ||
-          "WALLET_HOLDINGS_FAILED"
+        ok: false,
+        error: error instanceof Error ? error.message : "Unknown wallet holdings error",
       },
-      500
+      { status: 500 }
     )
   }
 }
