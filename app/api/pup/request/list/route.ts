@@ -1,6 +1,5 @@
 import {
-  normalizePupRequest,
-  pupRequests
+  listPupRequests
 } from "@/lib/pupRequestStore"
 
 export const runtime =
@@ -11,9 +10,7 @@ export const dynamic =
 
 export async function GET() {
   const normalized =
-    Array.from(
-      pupRequests.values()
-    ).map(normalizePupRequest)
+    await listPupRequests()
 
   const latestByCapsule =
     new Map<string, any>()
@@ -27,7 +24,8 @@ export async function GET() {
 
     if (
       !existing ||
-      request.createdAt > existing.createdAt
+      request.createdAt >
+        existing.createdAt
     ) {
       latestByCapsule.set(
         key,
@@ -41,7 +39,8 @@ export async function GET() {
       latestByCapsule.values()
     ).sort(
       (a, b) =>
-        b.createdAt - a.createdAt
+        b.createdAt -
+        a.createdAt
     )
 
   return Response.json({

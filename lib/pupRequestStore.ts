@@ -1,5 +1,9 @@
 import crypto from "crypto"
 
+import {
+  Redis
+} from "@upstash/redis"
+
 export type PupRequestStatus =
   | "pending"
   | "approved"
@@ -26,24 +30,53 @@ export type PupRequest = {
 const TTL =
   1000 * 60 * 5
 
+const TTL_SECONDS =
+  60 * 5
+
+const REQUEST_PREFIX =
+  "nexusnon:pup:request:"
+
+const REQUEST_INDEX =
+  "nexusnon:pup:requests"
+
+const hasKv =
+  Boolean(
+    process.env.KV_REST_API_URL &&
+    process.env.KV_REST_API_TOKEN
+  )
+
+const redis =
+  hasKv
+    ? new Redis({
+        url:
+          process.env.KV_REST_API_URL!,
+        token:
+          process.env.KV_REST_API_TOKEN!
+      })
+    : null
+
 const globalStore =
   globalThis as typeof globalThis & {
     __NEXUSNON_PUP_REQUESTS__?: Map<string, PupRequest>
   }
 
-export const pupRequests =
+const memoryRequests =
   globalStore.__NEXUSNON_PUP_REQUESTS__ ||
   new Map<string, PupRequest>()
 
 globalStore.__NEXUSNON_PUP_REQUESTS__ =
-  pupRequests
+  memoryRequests
 
 function now() {
   return Date.now()
 }
 
-function normalizeWallet(wallet: string) {
-  return String(wallet || "").trim().toLowerCase()
+function normalizeWallet(
+  wallet: string
+) {
+  return String(wallet || "")
+    .trim()
+    .toLowerCase()
 }
 
 function createId() {
@@ -58,38 +91,78 @@ export function normalizePupRequest(
   const current =
     now()
 
-  if (
-    request.status === "pending" &&
-    request.expiresAt <= current
-  ) {
-    request.status =
-      "expired"
-
-    request.updatedAt =
-      current
-
-    pupRequests.set(
-      request.id,
-      request
-    )
-  }
-
-  return {
+  const normalized: PupRequest = {
     ...request,
     wallet:
-      normalizeWallet(request.wallet)
+      normalizeWallet(
+        request.wallet
+      )
   }
+
+  if (
+    normalized.status === "pending" &&
+    normalized.expiresAt <= current
+  ) {
+    normalized.status =
+      "expired"
+
+    normalized.updatedAt =
+      current
+  }
+
+  return normalized
 }
 
-export function createPupRequest(input: {
-  capsuleId: string
-  wallet: string
-  email: string
-  phone: string
-  action?: string
-  capsuleStatus?: number
-  activationRequired?: boolean
-}) {
+async function saveRequest(
+  request: PupRequest
+) {
+  const normalized =
+    normalizePupRequest(
+      request
+    )
+
+  if (redis) {
+    await redis.set(
+      `${REQUEST_PREFIX}${normalized.id}`,
+      normalized,
+      {
+        ex:
+          TTL_SECONDS
+      }
+    )
+
+    await redis.zadd(
+      REQUEST_INDEX,
+      {
+        score:
+          normalized.createdAt,
+        member:
+          normalized.id
+      }
+    )
+
+    return normalized
+  }
+
+  memoryRequests.set(
+    normalized.id,
+    normalized
+  )
+
+  return normalized
+}
+
+export async function createPupRequest(
+  input: {
+    capsuleId: string
+    wallet: string
+    email: string
+    phone: string
+    action?: string
+    capsuleStatus?: number
+    activationRequired?: boolean
+  }
+) {
   const id =
     createId()
 
@@ -99,9 +172,13 @@ export function createPupRequest(input: {
   const request: PupRequest = {
     id,
     capsuleId:
-      String(input.capsuleId),
+      String(
+        input.capsuleId
+      ),
     wallet:
-      normalizeWallet(input.wallet),
+      normalizeWallet(
+        input.wallet
+      ),
     email:
       String(input.email || "")
         .trim()
@@ -110,7 +187,10 @@ export function createPupRequest(input: {
       String(input.phone || "")
         .trim(),
     action:
-      String(input.action || "LOGIN_DASHBOARD"),
+      String(
+        input.action ||
+        "LOGIN_DASHBOARD"
+      ),
     status:
       "pending",
     createdAt,
@@ -124,21 +204,31 @@ export function createPupRequest(input: {
       input.activationRequired
   }
 
-  pupRequests.set(
-    id,
-    request
-  )
-
-  return normalizePupRequest(
+  return await saveRequest(
     request
   )
 }
 
-export function getPupRequest(
+export async function getPupRequest(
   id: string
 ) {
+  if (redis) {
+    const request =
+      await redis.get<PupRequest>(
+        `${REQUEST_PREFIX}${id}`
+      )
+
+    if (!request) {
+      return null
+    }
+
+    return normalizePupRequest(
+      request
+    )
+  }
+
   const request =
-    pupRequests.get(id)
+    memoryRequests.get(id)
 
   if (!request) {
     return null
@@ -149,74 +239,122 @@ export function getPupRequest(
   )
 }
 
-export function approvePupRequest(
+export async function listPupRequests() {
+  if (redis) {
+    const ids =
+      await redis.zrange<string[]>(
+        REQUEST_INDEX,
+        0,
+        -1
+      )
+
+    const requests: PupRequest[] =
+      []
+
+    for (const id of ids) {
+      const request =
+        await getPupRequest(
+          id
+        )
+
+      if (request) {
+        requests.push(
+          request
+        )
+      }
+    }
+
+    return requests
+      .map(
+        normalizePupRequest
+      )
+      .sort(
+        (a, b) =>
+          b.createdAt - a.createdAt
+      )
+  }
+
+  return Array
+    .from(
+      memoryRequests.values()
+    )
+    .map(
+      normalizePupRequest
+    )
+    .sort(
+      (a, b) =>
+        b.createdAt - a.createdAt
+    )
+}
+
+export async function approvePupRequest(
   id: string
 ) {
   const request =
-    getPupRequest(id)
+    await getPupRequest(
+      id
+    )
 
   if (!request) {
     return null
   }
 
-  if (request.status !== "pending") {
+  if (
+    request.status !== "pending"
+  ) {
     return request
   }
 
   const current =
     now()
 
-  request.status =
-    "approved"
+  const updated: PupRequest = {
+    ...request,
+    status:
+      "approved",
+    approvedAt:
+      current,
+    updatedAt:
+      current
+  }
 
-  request.approvedAt =
-    current
-
-  request.updatedAt =
-    current
-
-  pupRequests.set(
-    id,
-    request
-  )
-
-  return normalizePupRequest(
-    request
+  return await saveRequest(
+    updated
   )
 }
 
-export function denyPupRequest(
+export async function denyPupRequest(
   id: string
 ) {
   const request =
-    getPupRequest(id)
+    await getPupRequest(
+      id
+    )
 
   if (!request) {
     return null
   }
 
-  if (request.status !== "pending") {
+  if (
+    request.status !== "pending"
+  ) {
     return request
   }
 
   const current =
     now()
 
-  request.status =
-    "denied"
+  const updated: PupRequest = {
+    ...request,
+    status:
+      "denied",
+    deniedAt:
+      current,
+    updatedAt:
+      current
+  }
 
-  request.deniedAt =
-    current
-
-  request.updatedAt =
-    current
-
-  pupRequests.set(
-    id,
-    request
-  )
-
-  return normalizePupRequest(
-    request
+  return await saveRequest(
+    updated
   )
 }

@@ -33,7 +33,7 @@ export async function GET(
   }
 
   const request =
-    getPupRequest(id)
+    await getPupRequest(id)
 
   if (!request) {
     return Response.json(

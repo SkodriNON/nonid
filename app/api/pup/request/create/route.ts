@@ -36,6 +36,14 @@ export async function POST(
       String(body.action || "LOGIN_DASHBOARD")
         .trim()
 
+    const capsuleStatus =
+      body.capsuleStatus !== undefined
+        ? Number(body.capsuleStatus)
+        : undefined
+
+    const activationRequired =
+      body.activationRequired === true
+
     if (
       !capsuleId ||
       !/^\d+$/.test(capsuleId)
@@ -69,12 +77,14 @@ export async function POST(
     }
 
     const request =
-      createPupRequest({
+      await createPupRequest({
         capsuleId,
         wallet,
         email,
         phone,
-        action
+        action,
+        capsuleStatus,
+        activationRequired
       })
 
     return Response.json({
