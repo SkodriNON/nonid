@@ -35,7 +35,7 @@ const ARBITRUM_SEPOLIA_PARAMS = {
   },
 
   rpcUrls: [
-    "https://sepolia-rollup.arbitrum.io/rpc"
+    process.env.ALCHEMY_ARBITRUM_SEPOLIA_RPC!
   ],
 
   blockExplorerUrls: [

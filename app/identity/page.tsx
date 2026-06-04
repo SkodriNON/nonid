@@ -90,7 +90,7 @@ function InfoRow({
 
 const RPC_URL =
   process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC_URL ||
-  "https://sepolia-rollup.arbitrum.io/rpc"
+  process.env.ALCHEMY_ARBITRUM_SEPOLIA_RPC!
 
 async function getNativeBalance(
   address: string
