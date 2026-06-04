@@ -163,30 +163,12 @@ export default function PupPage() {
       const data =
         await res.json()
 
-      if (data.success) {
-  const now =
-    Date.now()
-
-  const cleaned =
-    (data.requests || []).map(
-      (r: PupRequest) => {
-        if (
-          r.status === "pending" &&
-          r.expiresAt < now
-        ) {
-          return {
-            ...r,
-            status:
-              "expired"
-          }
-        }
-
-        return r
-      }
-    )
-
-  setRequests(cleaned)
+ if (data.success) {
+  setRequests(
+    data.requests || []
+  )
 }
+        
     } catch {
       setMessage(
         "Could not load PUP requests."
