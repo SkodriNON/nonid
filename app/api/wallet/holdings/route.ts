@@ -102,7 +102,13 @@ export async function GET(req: NextRequest) {
       return jsonError("Invalid wallet address")
     }
 
-    const provider = new ethers.providers.JsonRpcProvider(RPC_URL)
+    const provider = new ethers.providers.StaticJsonRpcProvider(
+  RPC_URL,
+  {
+    chainId: CHAIN_ID,
+    name: "arbitrum-sepolia",
+  }
+)
 
     const nativeRaw = await provider.getBalance(wallet)
 
