@@ -162,15 +162,10 @@ export async function GET(
     }
 
     const provider =
-      new ethers.providers.JsonRpcProvider(
-        rpcUrl,
-        {
-          name:
-            "arbitrum-sepolia",
-          chainId:
-            421614
-        }
-      )
+  new ethers.providers.StaticJsonRpcProvider(
+    rpcUrl,
+    421614
+  )
 
     const nativeWei =
       await provider.getBalance(
