@@ -793,21 +793,6 @@ export default function CardDashboard() {
                     <InfoRow label="Activated" value={activatedAt} />
                   </div>
 
-                  <button
-                    type="button"
-                    disabled={
-                      viewMode ||
-                      !pupSessionActive
-                    }
-                    onClick={() =>
-                      router.push(
-                        `/identity?capsuleId=${capsuleId}&wallet=${wallet}`
-                      )
-                    }
-                    className="h-[56px] rounded-[20px] bg-cyan-300 font-black text-black disabled:opacity-50"
-                  >
-                    Open Identity
-                  </button>
                 </div>
               )}
 
