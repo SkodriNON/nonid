@@ -1,19 +1,8 @@
-import {
-  ethers
-} from "ethers"
-
 export const runtime =
   "nodejs"
 
 export const dynamic =
   "force-dynamic"
-
-const ERC20_ABI = [
-  "function balanceOf(address) view returns (uint256)",
-  "function decimals() view returns (uint8)",
-  "function symbol() view returns (string)",
-  "function name() view returns (string)"
-]
 
 function getEnv(
   names: string[]
@@ -46,55 +35,102 @@ function json(
 function short(
   value: string
 ) {
-  if (!value) return ""
+  if (!value) {
+    return ""
+  }
 
   return `${value.slice(0, 6)}...${value.slice(-4)}`
 }
 
-async function readTokenMeta(
-  provider: ethers.providers.JsonRpcProvider,
-  token: string
+function formatUnits(
+  raw: string,
+  decimals: number
 ) {
-  const contract =
-    new ethers.Contract(
-      token,
-      ERC20_ABI,
-      provider
+  const clean =
+    String(raw || "0")
+
+  const dec =
+    Number.isFinite(decimals)
+      ? decimals
+      : 18
+
+  if (!/^\d+$/.test(clean)) {
+    return "0"
+  }
+
+  if (dec <= 0) {
+    return clean
+  }
+
+  const padded =
+    clean.padStart(dec + 1, "0")
+
+  const whole =
+    padded.slice(0, -dec)
+
+  const fraction =
+    padded
+      .slice(-dec)
+      .replace(/0+$/, "")
+
+  return fraction
+    ? `${whole}.${fraction}`
+    : whole
+}
+
+async function arbiscan(
+  params: Record<string, string>
+) {
+  const key =
+    getEnv([
+      "ARBISCAN_API_KEY",
+      "ETHERSCAN_API_KEY"
+    ])
+
+  if (!key) {
+    throw new Error(
+      "ARBISCAN_API_KEY_MISSING"
+    )
+  }
+
+  const url =
+    new URL(
+      "https://api-sepolia.arbiscan.io/api"
     )
 
-  let decimals = 18
-  let symbol =
-    short(token)
-  let name =
-    "Unknown Token"
-
-  try {
-    decimals =
-      Number(
-        await contract.decimals()
-      )
-  } catch {}
-
-  try {
-    symbol =
-      String(
-        await contract.symbol()
-      )
-  } catch {}
-
-  try {
-    name =
-      String(
-        await contract.name()
-      )
-  } catch {}
-
-  return {
-    contract,
-    decimals,
-    symbol,
-    name
+  for (const [k, v] of Object.entries(params)) {
+    url.searchParams.set(k, v)
   }
+
+  url.searchParams.set(
+    "apikey",
+    key
+  )
+
+  const res =
+    await fetch(
+      url.toString(),
+      {
+        cache:
+          "no-store"
+      }
+    )
+
+  const data =
+    await res.json()
+
+  if (
+    data.status === "0" &&
+    data.message !== "No transactions found"
+  ) {
+    throw new Error(
+      data.result ||
+      data.message ||
+      "ARBISCAN_API_ERROR"
+    )
+  }
+
+  return data.result
 }
 
 export async function GET(
@@ -123,97 +159,17 @@ export async function GET(
       )
     }
 
-    const rpcUrls = [
-  getEnv([
-    "ARBITRUM_SEPOLIA_RPC_URL",
-    "NETWORK_RPC",
-    "NEXT_PUBLIC_RPC_URL",
-    "NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC",
-    "NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC_URL",
-    "NEXT_PUBLIC_ARBITRUM_RPC"
-  ]),
-  "https://sepolia-rollup.arbitrum.io/rpc",
-  "https://arbitrum-sepolia.drpc.org"
-].filter(Boolean)
-    const arbiscanKey =
-      getEnv([
-        "ARBISCAN_API_KEY",
-        "ETHERSCAN_API_KEY"
-      ])
-
-    if (rpcUrls.length === 0) {
-      return json(
-        {
-          success: false,
-          error:
-            "RPC_URL_MISSING"
-        },
-        500
-      )
-    }
-
-    if (!arbiscanKey) {
-      return json(
-        {
-          success: false,
-          error:
-            "ARBISCAN_API_KEY_MISSING"
-        },
-        500
-      )
-    }
-
-    let provider:
-  ethers.providers.StaticJsonRpcProvider | null =
-    null
-
-let nativeWei:
-  ethers.BigNumber | null =
-    null
-
-let lastRpcError = ""
-
-for (const url of rpcUrls) {
-  try {
-    const candidate =
-      new ethers.providers.StaticJsonRpcProvider(
-        url,
-        421614
-      )
-
-    const balance =
-      await candidate.getBalance(
-        wallet
-      )
-
-    provider =
-      candidate
-
-    nativeWei =
-      balance
-
-    break
-  } catch (err: any) {
-    lastRpcError =
-      err?.message ||
-      "RPC_FAILED"
-  }
-}
-
-if (
-  !provider ||
-  !nativeWei
-) {
-  return json(
-    {
-      success: false,
-      error:
-        lastRpcError ||
-        "ALL_RPC_PROVIDERS_FAILED"
-    },
-    500
-  )
-}
+    const nativeRaw =
+      await arbiscan({
+        module:
+          "account",
+        action:
+          "balance",
+        address:
+          wallet,
+        tag:
+          "latest"
+      })
 
     const native = {
       type:
@@ -227,106 +183,70 @@ if (
       decimals:
         18,
       rawBalance:
-        nativeWei.toString(),
+        String(nativeRaw || "0"),
       balance:
-        ethers.utils.formatEther(
-          nativeWei
+        formatUnits(
+          String(nativeRaw || "0"),
+          18
         )
     }
 
-    const apiUrl =
-      new URL(
-        "https://api-sepolia.arbiscan.io/api"
-      )
-
-    apiUrl.searchParams.set(
-      "module",
-      "account"
-    )
-
-    apiUrl.searchParams.set(
-      "action",
-      "tokentx"
-    )
-
-    apiUrl.searchParams.set(
-      "address",
-      wallet
-    )
-
-    apiUrl.searchParams.set(
-      "startblock",
-      "0"
-    )
-
-    apiUrl.searchParams.set(
-      "endblock",
-      "999999999"
-    )
-
-    apiUrl.searchParams.set(
-      "sort",
-      "desc"
-    )
-
-    apiUrl.searchParams.set(
-      "apikey",
-      arbiscanKey
-    )
-
-    const response =
-      await fetch(
-        apiUrl.toString(),
-        {
-          cache:
-            "no-store"
-        }
-      )
-
-    const data =
-      await response.json()
-
     const transfers =
-      Array.isArray(data?.result)
-        ? data.result
-        : []
+      await arbiscan({
+        module:
+          "account",
+        action:
+          "tokentx",
+        address:
+          wallet,
+        startblock:
+          "0",
+        endblock:
+          "999999999",
+        sort:
+          "desc"
+      })
 
     const tokenMap =
       new Map<string, any>()
 
-    for (const tx of transfers) {
-      const tokenAddress =
-        String(
-          tx.contractAddress || ""
-        ).toLowerCase()
+    if (Array.isArray(transfers)) {
+      for (const tx of transfers) {
+        const tokenAddress =
+          String(
+            tx.contractAddress || ""
+          ).toLowerCase()
 
-      if (
-        !tokenAddress ||
-        !/^0x[a-fA-F0-9]{40}$/.test(tokenAddress)
-      ) {
-        continue
-      }
+        if (
+          !tokenAddress ||
+          !/^0x[a-fA-F0-9]{40}$/.test(tokenAddress)
+        ) {
+          continue
+        }
 
-      if (
-        !tokenMap.has(tokenAddress)
-      ) {
-        tokenMap.set(
-          tokenAddress,
-          {
-            contractAddress:
-              tokenAddress,
-            name:
-              tx.tokenName ||
-              "Unknown Token",
-            symbol:
-              tx.tokenSymbol ||
-              short(tokenAddress),
-            decimals:
-              Number(
-                tx.tokenDecimal || 18
-              )
-          }
-        )
+        if (!tokenMap.has(tokenAddress)) {
+          tokenMap.set(
+            tokenAddress,
+            {
+              type:
+                "erc20",
+              name:
+                tx.tokenName ||
+                "Unknown Token",
+              symbol:
+                tx.tokenSymbol ||
+                short(tokenAddress),
+              contractAddress:
+                tokenAddress,
+              decimals:
+                Number(tx.tokenDecimal || 18),
+              rawBalance:
+                "0",
+              balance:
+                "0"
+            }
+          )
+        }
       }
     }
 
@@ -335,54 +255,45 @@ if (
 
     for (const token of tokenMap.values()) {
       try {
-        const meta =
-          await readTokenMeta(
-            provider,
-            token.contractAddress
-          )
+        const raw =
+          await arbiscan({
+            module:
+              "account",
+            action:
+              "tokenbalance",
+            contractaddress:
+              token.contractAddress,
+            address:
+              wallet,
+            tag:
+              "latest"
+          })
 
-        const balanceRaw =
-          await meta.contract.balanceOf(
-            wallet
-          )
+        const rawString =
+          String(raw || "0")
 
         if (
-          ethers.BigNumber
-            .from(balanceRaw)
-            .isZero()
+          rawString === "0"
         ) {
           continue
         }
 
         tokens.push({
-          type:
-            "erc20",
-          name:
-            meta.name ||
-            token.name,
-          symbol:
-            meta.symbol ||
-            token.symbol,
-          contractAddress:
-            token.contractAddress,
-          decimals:
-            meta.decimals ??
-            token.decimals,
+          ...token,
           rawBalance:
-            balanceRaw.toString(),
+            rawString,
           balance:
-            ethers.utils.formatUnits(
-              balanceRaw,
-              meta.decimals ??
-                token.decimals
+            formatUnits(
+              rawString,
+              token.decimals
             )
         })
-
       } catch {}
     }
 
     return json({
-      success: true,
+      success:
+        true,
       wallet,
       chainId:
         421614,
