@@ -1,9 +1,8 @@
-
 "use client"
 
 import {
-  PrivyProvider
-} from "@privy-io/react-auth"
+  LanguageProvider
+} from "@/components/LanguageSystem"
 
 export default function Providers({
 
@@ -13,48 +12,14 @@ export default function Providers({
 
   children:
     React.ReactNode
-
 }) {
 
   return (
 
-    <PrivyProvider
-
-      appId={
-        process.env
-          .NEXT_PUBLIC_PRIVY_APP_ID!
-      }
-
-      config={{
-
-        appearance: {
-
-          theme: "dark",
-
-          accentColor:
-            "#00ffff",
-
-          logo:
-            "/favicon.ico"
-        },
-
-      
-embeddedWallets: {
-
-  ethereum: {
-
-    createOnLogin:
-      "users-without-wallets"
-  }
-}
-
-
-      }}
-    >
+    <LanguageProvider>
 
       {children}
 
-    </PrivyProvider>
+    </LanguageProvider>
   )
 }
-

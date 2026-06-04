@@ -1,21 +1,22 @@
-
-import type {
-  NextConfig
-} from "next"
-
-const nextConfig: NextConfig = {
-
-  webpack: (config) => {
-
-    config.externals.push({
-
-      "@nomicfoundation/hardhat-ignition/modules":
-        "commonjs @nomicfoundation/hardhat-ignition/modules"
-    })
-
-    return config
-  }
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin-allow-popups",
+          },
+          {
+            key: "Cross-Origin-Embedder-Policy",
+            value: "unsafe-none",
+          },
+        ],
+      },
+    ]
+  },
 }
 
-export default nextConfig
-
+module.exports = nextConfig

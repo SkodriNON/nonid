@@ -1,32 +1,88 @@
-
 @import "tailwindcss";
+@import "react-international-phone/style.css";
 
-html,
+/* ROOT */
+
+:root {
+
+  color-scheme: dark;
+
+  --nexus-bg: #050816;
+  --nexus-bg-deep: #030712;
+  --nexus-bg-black: #02040a;
+
+  --nexus-cyan: #00ffff;
+  --nexus-cyan-soft: rgba(0,255,255,0.16);
+
+  --nexus-blue: #3b82f6;
+  --nexus-blue-soft: rgba(59,130,246,0.16);
+
+  --nexus-violet: #8b5cf6;
+  --nexus-violet-soft: rgba(139,92,246,0.16);
+
+  --nexus-text: #ffffff;
+  --nexus-muted: #a1a1aa;
+  --nexus-muted-2: #71717a;
+
+  --nexus-border: rgba(255,255,255,0.08);
+  --nexus-border-strong: rgba(255,255,255,0.14);
+
+  --nexus-glass: rgba(255,255,255,0.04);
+  --nexus-glass-strong: rgba(255,255,255,0.07);
+
+  --nexus-radius-sm: 16px;
+  --nexus-radius-md: 22px;
+  --nexus-radius-lg: 30px;
+  --nexus-radius-xl: 40px;
+
+  --nexus-shadow:
+    0 24px 90px rgba(0,0,0,0.35);
+
+  --nexus-glow-cyan:
+    0 0 80px rgba(0,255,255,0.12);
+
+  --nexus-glow-blue:
+    0 0 90px rgba(59,130,246,0.12);
+}
+
+/* BASE */
+
+html {
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
+  background: var(--nexus-bg);
+}
+
 body {
-
   margin: 0;
   padding: 0;
-
-  width: 100%;
-  min-height: 100%;
-
   overflow-x: hidden;
 
   background:
     radial-gradient(
-      circle at top,
-      rgba(17,24,39,1) 0%,
-      rgba(5,5,5,1) 45%,
-      rgba(0,0,0,1) 100%
-    );
+      circle at top left,
+      rgba(0,255,255,0.08),
+      transparent 35%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(0,120,255,0.08),
+      transparent 35%
+    ),
+    var(--nexus-bg);
 
-  color: white;
+  color: var(--nexus-text);
 
   font-family:
     Inter,
-    Arial,
-    Helvetica,
+    SF Pro Display,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    Segoe UI,
     sans-serif;
+
+  text-rendering: optimizeLegibility;
 
   -webkit-font-smoothing:
     antialiased;
@@ -35,131 +91,825 @@ body {
     grayscale;
 }
 
-body {
-
-  position: relative;
-}
-
-/* GLOBAL RESET */
-
 * {
-
   box-sizing: border-box;
 }
 
-button,
-input,
-select,
-textarea {
+::selection {
+  background:
+    rgba(0,255,255,0.22);
 
-  font: inherit;
+  color: white;
 }
 
 /* SCROLLBAR */
 
 ::-webkit-scrollbar {
-
   width: 8px;
 }
 
 ::-webkit-scrollbar-track {
-
   background:
-    rgba(255,255,255,0.03);
+    rgba(255,255,255,0.02);
 }
 
 ::-webkit-scrollbar-thumb {
-
   background:
-    rgba(255,255,255,0.14);
+    rgba(255,255,255,0.10);
 
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-
   background:
-    rgba(255,255,255,0.22);
+    rgba(255,255,255,0.18);
 }
 
-/* SMOOTH */
+/* ELEMENTS */
 
-html {
-
-  scroll-behavior: smooth;
+button {
+  cursor: pointer;
 }
 
-/* SELECTION */
+button:disabled {
+  cursor: not-allowed;
+}
 
-::selection {
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+}
+
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+/* GLOBAL NEXUS DESIGN SYSTEM */
+
+.nexus-page {
+
+  min-height: 100svh;
+
+  overflow-x: hidden;
 
   background:
-    rgba(59,130,246,0.85);
+    radial-gradient(
+      circle at top,
+      rgba(0,255,255,0.12),
+      transparent 38%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(59,130,246,0.10),
+      transparent 38%
+    ),
+    radial-gradient(
+      circle at bottom left,
+      rgba(139,92,246,0.08),
+      transparent 35%
+    ),
+    var(--nexus-bg-black);
 
   color:
     white;
 }
 
-/* LINKS */
+.nexus-container {
 
-a {
+  width: 100%;
 
-  color: inherit;
-  text-decoration: none;
+  max-width: 1600px;
+
+  margin-inline: auto;
+
+  padding-left:
+    clamp(16px, 3vw, 48px);
+
+  padding-right:
+    clamp(16px, 3vw, 48px);
 }
 
-/* IMAGES */
+.nexus-section {
 
-img {
+  position: relative;
 
-  user-select: none;
-  -webkit-user-drag: none;
+  z-index: 10;
 }
 
-/* INPUT FIXES */
+.nexus-card {
 
-input,
-textarea,
-select {
-
-  border: none;
-  outline: none;
-}
-
-/* MOBILE SAFE */
-
-body,
-main {
-
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-/* GLASS EFFECT HELPERS */
-
-.glass {
+  border:
+    1px solid var(--nexus-border);
 
   background:
-    rgba(255,255,255,0.04);
+    rgba(255,255,255,0.035);
 
   backdrop-filter:
     blur(24px);
 
+  -webkit-backdrop-filter:
+    blur(24px);
+
+  box-shadow:
+    var(--nexus-shadow);
+}
+
+.nexus-card-strong {
+
   border:
-    1px solid rgba(255,255,255,0.08);
-}
+    1px solid var(--nexus-border-strong);
 
-/* CINEMATIC GLOW */
+  background:
+    rgba(255,255,255,0.055);
 
-.glow-cyan {
+  backdrop-filter:
+    blur(28px);
 
-  box-shadow:
-    0 0 40px rgba(59,130,246,0.25);
-}
-
-.glow-pink {
+  -webkit-backdrop-filter:
+    blur(28px);
 
   box-shadow:
-    0 0 40px rgba(236,72,153,0.25);
+    var(--nexus-shadow),
+    var(--nexus-glow-cyan);
 }
 
+.nexus-glass {
+
+  background:
+    var(--nexus-glass);
+
+  backdrop-filter:
+    blur(30px);
+
+  -webkit-backdrop-filter:
+    blur(30px);
+
+  border:
+    1px solid var(--nexus-border);
+}
+
+.nexus-orb-cyan {
+
+  position:
+    absolute;
+
+  width:
+    clamp(240px, 35vw, 620px);
+
+  height:
+    clamp(240px, 35vw, 620px);
+
+  border-radius:
+    999px;
+
+  background:
+    rgba(0,255,255,0.10);
+
+  filter:
+    blur(120px);
+
+  pointer-events:
+    none;
+}
+
+.nexus-orb-blue {
+
+  position:
+    absolute;
+
+  width:
+    clamp(220px, 30vw, 560px);
+
+  height:
+    clamp(220px, 30vw, 560px);
+
+  border-radius:
+    999px;
+
+  background:
+    rgba(59,130,246,0.10);
+
+  filter:
+    blur(120px);
+
+  pointer-events:
+    none;
+}
+
+.nexus-orb-violet {
+
+  position:
+    absolute;
+
+  width:
+    clamp(220px, 30vw, 560px);
+
+  height:
+    clamp(220px, 30vw, 560px);
+
+  border-radius:
+    999px;
+
+  background:
+    rgba(139,92,246,0.10);
+
+  filter:
+    blur(120px);
+
+  pointer-events:
+    none;
+}
+
+.nexus-title {
+
+  letter-spacing:
+    -0.075em;
+
+  line-height:
+    0.88;
+}
+
+.nexus-subtitle {
+
+  line-height:
+    1.8;
+
+  color:
+    #d4d4d8;
+}
+
+.nexus-badge {
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border:
+    1px solid rgba(0,255,255,0.16);
+
+  background:
+    rgba(0,255,255,0.07);
+
+  color:
+    #67e8f9;
+
+  border-radius:
+    999px;
+
+  padding:
+    10px 14px;
+
+  font-size:
+    11px;
+
+  font-weight:
+    900;
+
+  text-transform:
+    uppercase;
+
+  letter-spacing:
+    0.22em;
+}
+
+.nexus-primary {
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  min-height:
+    56px;
+
+  border-radius:
+    22px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #00ffff,
+      #3b82f6
+    );
+
+  color:
+    black;
+
+  font-size:
+    13px;
+
+  font-weight:
+    950;
+
+  text-transform:
+    uppercase;
+
+  letter-spacing:
+    0.13em;
+
+  box-shadow:
+    0 20px 60px rgba(0,255,255,0.16);
+
+  transition:
+    0.18s ease;
+}
+
+.nexus-primary:hover {
+
+  filter:
+    brightness(1.06);
+
+  transform:
+    translateY(-1px)
+    scale(1.012);
+}
+
+.nexus-primary:active {
+
+  transform:
+    scale(0.985);
+}
+
+.nexus-secondary {
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  min-height:
+    56px;
+
+  border-radius:
+    22px;
+
+  background:
+    rgba(255,255,255,0.04);
+
+  border:
+    1px solid rgba(255,255,255,0.10);
+
+  color:
+    white;
+
+  font-size:
+    13px;
+
+  font-weight:
+    850;
+
+  text-transform:
+    uppercase;
+
+  letter-spacing:
+    0.13em;
+
+  transition:
+    0.18s ease;
+}
+
+.nexus-secondary:hover {
+
+  background:
+    rgba(255,255,255,0.08);
+
+  transform:
+    translateY(-1px);
+}
+
+.nexus-secondary:active {
+
+  transform:
+    scale(0.985);
+}
+
+.nexus-input {
+
+  width:
+    100%;
+
+  min-height:
+    56px;
+
+  border-radius:
+    20px;
+
+  border:
+    1px solid rgba(255,255,255,0.10);
+
+  background:
+    rgba(0,0,0,0.30);
+
+  padding:
+    0 20px;
+
+  color:
+    white;
+
+  outline:
+    none;
+
+  transition:
+    0.18s ease;
+}
+
+.nexus-input::placeholder {
+
+  color:
+    #71717a;
+}
+
+.nexus-input:focus {
+
+  border-color:
+    rgba(0,255,255,0.55);
+
+  box-shadow:
+    0 0 0 3px rgba(0,255,255,0.08);
+}
+
+.nexus-text-glow {
+
+  text-shadow:
+    0 0 42px rgba(0,255,255,0.24);
+}
+
+/* SAFE AREA SUPPORT */
+
+.safe-top {
+  padding-top:
+    env(safe-area-inset-top);
+}
+
+.safe-bottom {
+  padding-bottom:
+    env(safe-area-inset-bottom);
+}
+
+.safe-left {
+  padding-left:
+    env(safe-area-inset-left);
+}
+
+.safe-right {
+  padding-right:
+    env(safe-area-inset-right);
+}
+
+.safe-x {
+
+  padding-left:
+    env(safe-area-inset-left);
+
+  padding-right:
+    env(safe-area-inset-right);
+}
+
+.safe-y {
+
+  padding-top:
+    env(safe-area-inset-top);
+
+  padding-bottom:
+    env(safe-area-inset-bottom);
+}
+
+/* PHONE BASE */
+
+.react-international-phone-input-container {
+  width: 100%;
+  background: transparent !important;
+}
+
+.react-international-phone-country-selector-button {
+  height: 56px !important;
+
+  background: transparent !important;
+
+  border: none !important;
+
+  transition: 0.2s ease;
+}
+
+.react-international-phone-country-selector-button:hover {
+  background:
+    rgba(255,255,255,0.04) !important;
+}
+
+.react-international-phone-country-selector-button__flag-emoji {
+  font-size: 20px !important;
+}
+
+.react-international-phone-country-selector-button__dropdown-arrow {
+  color: #71717a !important;
+}
+
+.react-international-phone-input {
+  height: 56px !important;
+
+  background: transparent !important;
+
+  border: none !important;
+
+  color: white !important;
+
+  font-size: 15px !important;
+
+  font-weight: 500 !important;
+
+  outline: none !important;
+
+  box-shadow: none !important;
+}
+
+.react-international-phone-input::placeholder {
+  color: #71717a !important;
+}
+
+/* PHONE DROPDOWN */
+
+.react-international-phone-country-selector-dropdown {
+  z-index: 999999 !important;
+
+  width: 340px !important;
+
+  max-height: 420px !important;
+
+  overflow-y: auto !important;
+
+  overflow-x: hidden !important;
+
+  background:
+    rgba(11,17,32,0.98) !important;
+
+  border:
+    1px solid rgba(255,255,255,0.08) !important;
+
+  border-radius: 24px !important;
+
+  backdrop-filter: blur(24px);
+
+  -webkit-backdrop-filter: blur(24px);
+
+  padding: 0 !important;
+
+  box-shadow:
+    0 20px 80px rgba(0,0,0,0.45) !important;
+}
+
+/* PHONE SEARCH */
+
+.react-international-phone-country-selector-dropdown__search-container {
+  position: sticky !important;
+
+  top: 0 !important;
+
+  z-index: 999 !important;
+
+  background:
+    rgba(11,17,32,0.98) !important;
+
+  padding: 10px !important;
+
+  border-bottom:
+    1px solid rgba(255,255,255,0.05);
+}
+
+.react-international-phone-country-selector-dropdown__search-input {
+  width: 100% !important;
+
+  height: 48px !important;
+
+  background:
+    rgba(255,255,255,0.04) !important;
+
+  border:
+    1px solid rgba(255,255,255,0.08) !important;
+
+  border-radius: 14px !important;
+
+  color: white !important;
+
+  font-size: 14px !important;
+
+  padding-left: 14px !important;
+
+  padding-right: 14px !important;
+
+  outline: none !important;
+}
+
+.react-international-phone-country-selector-dropdown__search-input::placeholder {
+  color: #71717a !important;
+}
+
+/* COUNTRY ITEMS */
+
+.react-international-phone-country-selector-dropdown__list-item {
+  min-height: 52px !important;
+
+  border-radius: 14px !important;
+
+  margin: 4px 8px !important;
+
+  transition: 0.18s ease !important;
+}
+
+.react-international-phone-country-selector-dropdown__list-item:hover {
+  background:
+    rgba(255,255,255,0.05) !important;
+}
+
+.react-international-phone-country-selector-dropdown__list-item-country-name {
+  color: white !important;
+
+  font-size: 14px !important;
+
+  font-weight: 600 !important;
+}
+
+.react-international-phone-country-selector-dropdown__list-item-dial-code {
+  color: #71717a !important;
+
+  font-size: 12px !important;
+}
+
+/* PHONE DROPDOWN SCROLLBAR */
+
+.react-international-phone-country-selector-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.react-international-phone-country-selector-dropdown::-webkit-scrollbar-thumb {
+  background:
+    rgba(255,255,255,0.12);
+
+  border-radius: 999px;
+}
+
+/* OTP */
+
+input[inputmode="numeric"] {
+  caret-color: var(--nexus-cyan);
+}
+
+/* FOCUS */
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+}
+
+:focus-visible {
+
+  outline:
+    2px solid rgba(0,255,255,0.55);
+
+  outline-offset:
+    2px;
+}
+
+/* IOS */
+
+@supports (-webkit-touch-callout: none) {
+
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* MOBILE */
+
+@media (max-width: 768px) {
+
+  .react-international-phone-country-selector-dropdown {
+    width: 100% !important;
+
+    max-width: 100% !important;
+  }
+
+  img[src="/logopopup.png"] {
+    width: 170px !important;
+  }
+
+  input[inputmode="numeric"] {
+    height: 48px !important;
+
+    font-size: 18px !important;
+  }
+}
+
+/* SMALL MOBILE */
+
+@media (max-width: 420px) {
+
+  .nexus-container {
+
+    padding-left:
+      16px;
+
+    padding-right:
+      16px;
+  }
+
+  .nexus-badge {
+
+    letter-spacing:
+      0.16em;
+
+    font-size:
+      10px;
+  }
+
+  .nexus-primary,
+  .nexus-secondary {
+
+    width:
+      100%;
+  }
+}
+
+/* FOLDABLE DEVICES */
+
+@media (min-width: 540px) and (max-width: 720px) {
+
+  .nexus-container {
+
+    max-width:
+      680px;
+  }
+}
+
+/* TABLET LANDSCAPE */
+
+@media (min-width: 900px) and (max-width: 1200px) {
+
+  .nexus-container {
+
+    max-width:
+      1120px;
+  }
+}
+
+/* LARGE DESKTOP */
+
+@media (min-width: 2000px) {
+
+  html {
+    font-size:
+      18px;
+  }
+
+  .nexus-container {
+
+    max-width:
+      1800px;
+  }
+}
+
+/* ACCESSIBILITY */
+
+@media (prefers-reduced-motion: reduce) {
+
+  * {
+
+    animation:
+      none !important;
+
+    transition:
+      none !important;
+
+    scroll-behavior:
+      auto !important;
+  }
+}

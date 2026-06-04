@@ -1,747 +1,443 @@
-
 "use client"
 
-import Image from "next/image"
+import { useState } from "react"
 import Link from "next/link"
 
-import {
-  usePrivy
-} from "@privy-io/react-auth"
-
-
+import NexusHeader from "@/components/layout/NexusHeader"
 
 import {
-  useEffect,
-  useState
-} from "react"
+  useLanguage
+} from "@/components/LanguageSystem"
 
-import AIChat
-from "../components/AIChat"
+type Panel =
+  | "vision"
+  | "architecture"
+  | "security"
+  | "roadmap"
 
-export default function Home() {
+export default function Page() {
 
-  const [
-    assistant,
-    setAssistant
-  ] = useState<
-    "NΩNI" | "NΩNA"
-  >("NΩNI")
+  const { t } =
+    useLanguage()
 
-  const [
-    language,
-    setLanguage
-  ] = useState("en")
+  const [active, setActive] =
+    useState<Panel>("vision")
 
-  useEffect(() => {
+  const panels = {
+    vision: {
+      menu: t("home.menu.vision"),
+      title: t("home.vision.title"),
+      subtitle: t("home.vision.subtitle"),
+      text: t("home.vision.text"),
+      points: [
+        t("home.point.ownership"),
+        t("home.point.capsule"),
+        t("home.point.contract")
+      ]
+    },
 
-    if (
-      typeof window ===
-      "undefined"
-    ) return
+    architecture: {
+      menu: t("home.menu.architecture"),
+      title: t("home.architecture.title"),
+      subtitle: t("home.architecture.subtitle"),
+      text: t("home.architecture.text"),
+      points: [
+        t("home.point.oneWallet"),
+        t("home.point.verification"),
+        t("home.point.dashboard")
+      ]
+    },
 
-    const savedLanguage =
-      localStorage.getItem(
-        "nexus_language"
-      )
+    security: {
+      menu: t("home.menu.security"),
+      title: t("home.security.title"),
+      subtitle: t("home.security.subtitle"),
+      text: t("home.security.text"),
+      points: [
+        t("home.point.noLocal"),
+        t("home.point.noDatabase"),
+        t("home.point.noFake")
+      ]
+    },
 
-    if (savedLanguage) {
-
-      setLanguage(
-        savedLanguage
-      )
+    roadmap: {
+      menu: t("home.menu.roadmap"),
+      title: t("home.roadmap.title"),
+      subtitle: t("home.roadmap.subtitle"),
+      text: t("home.roadmap.text"),
+      points: [
+        t("home.point.phase1"),
+        t("home.point.phase2"),
+        t("home.point.phase3")
+      ]
     }
-
-  }, [])
-
- 
-const translations: any = {
-
-  en: {
-
-    start:
-      "Start Identity",
-
-    dashboard:
-      "Dashboard",
-
-    subtitle:
-      "Universal sovereign identity infrastructure."
-  },
-
-  sq: {
-
-    start:
-      "Fillo Identitetin",
-
-    dashboard:
-      "Paneli",
-
-    subtitle:
-      "Infrastrukturë sovrane universale identiteti."
-  },
-
-  sv: {
-
-    start:
-      "Starta Identitet",
-
-    dashboard:
-      "Kontrollpanel",
-
-    subtitle:
-      "Universell suverän identitetsinfrastruktur."
-  },
-
-  de: {
-
-    start:
-      "Identität Starten",
-
-    dashboard:
-      "Dashboard",
-
-    subtitle:
-      "Universelle souveräne Identitätsinfrastruktur."
-  },
-
-  fr: {
-
-    start:
-      "Démarrer l'identité",
-
-    dashboard:
-      "Tableau de bord",
-
-    subtitle:
-      "Infrastructure universelle d'identité souveraine."
-  },
-
-  es: {
-
-    start:
-      "Iniciar Identidad",
-
-    dashboard:
-      "Panel",
-
-    subtitle:
-      "Infraestructura universal de identidad soberana."
-  },
-
-  it: {
-
-    start:
-      "Avvia Identità",
-
-    dashboard:
-      "Dashboard",
-
-    subtitle:
-      "Infrastruttura universale di identità sovrana."
-  },
-
-  tr: {
-
-    start:
-      "Kimliği Başlat",
-
-    dashboard:
-      "Panel",
-
-    subtitle:
-      "Evrensel egemen kimlik altyapısı."
-  },
-
-  ar: {
-
-    start:
-      "ابدأ الهوية",
-
-    dashboard:
-      "لوحة التحكم",
-
-    subtitle:
-      "بنية تحتية عالمية للهوية السيادية."
-  },
-
-  ru: {
-
-    start:
-      "Начать идентификацию",
-
-    dashboard:
-      "Панель",
-
-    subtitle:
-      "Универсальная инфраструктура суверенной идентичности."
-  },
-
-  zh: {
-
-    start:
-      "开始身份",
-
-    dashboard:
-      "控制面板",
-
-    subtitle:
-      "全球主权身份基础设施。"
-  },
-
-  ja: {
-
-    start:
-      "IDを開始",
-
-    dashboard:
-      "ダッシュボード",
-
-    subtitle:
-      "ユニバーサル主権IDインフラ。"
-  },
-
-  ko: {
-
-    start:
-      "신원 시작",
-
-    dashboard:
-      "대시보드",
-
-    subtitle:
-      "범용 주권 신원 인프라."
   }
-}
 
-
-const {
-
-  login,
-
-  authenticated,
-
-  user
-
-} = usePrivy()
-
-
-  const t =
-
-    translations[language]
-
-    || translations.en
+  const current =
+    panels[active]
 
   return (
+    <>
+      <NexusHeader />
 
-    <main className="
-      relative
-      min-h-screen
-      overflow-hidden
-      flex
-      items-center
-      justify-center
-      px-4
-      py-6
-      bg-black
-    ">
-
-      {/* BACKGROUND */}
-
-      <div className="
-        absolute
-        inset-0
-        -z-10
+      <main className="
+        nexus-page
+        min-h-screen
         overflow-hidden
+        text-white
       ">
 
         <div className="
-          absolute
-          top-[-20%]
-          left-1/2
-          -translate-x-1/2
-          w-[900px]
-          h-[900px]
-          rounded-full
-          bg-cyan-500/10
-          blur-[180px]
-        "/>
-
-        <div className="
-          absolute
-          bottom-[-20%]
-          right-[-10%]
-          w-[700px]
-          h-[700px]
-          rounded-full
-          bg-pink-500/10
-          blur-[180px]
-        "/>
-
-      </div>
-
-      {/* LANGUAGE */}
-
-      <div className="
-        absolute
-        top-4
-        right-4
-        z-50
-      ">
-
-        <select
-
-          value={language}
-
-          onChange={(e)=>{
-
-            setLanguage(
-              e.target.value
-            )
-
-            localStorage.setItem(
-
-              "nexus_language",
-
-              e.target.value
-            )
-          }}
-
-          className="
-            h-[42px]
-            w-[150px]
-            rounded-[14px]
-            border
-            border-white/10
-            bg-black/60
-            px-3
-            text-sm
-            text-white
-            backdrop-blur-xl
-            outline-none
-          "
-        >
-<option value="en">
-  🇺🇸 English
-</option>
-
-<option value="sq">
-  🇦🇱 Shqip
-</option>
-
-<option value="sv">
-  🇸🇪 Svenska
-</option>
-
-<option value="de">
-  🇩🇪 Deutsch
-</option>
-
-<option value="fr">
-  🇫🇷 Français
-</option>
-
-<option value="es">
-  🇪🇸 Español
-</option>
-
-<option value="it">
-  🇮🇹 Italiano
-</option>
-
-<option value="tr">
-  🇹🇷 Türkçe
-</option>
-
-<option value="ar">
-  🇸🇦 العربية
-</option>
-
-<option value="ru">
-  🇷🇺 Русский
-</option>
-
-<option value="zh">
-  🇨🇳 中文
-</option>
-
-<option value="ja">
-  🇯🇵 日本語
-</option>
-
-<option value="ko">
-  🇰🇷 한국어
-</option>
-
-
-
-        </select>
-
-      </div>
-
-      {/* MAIN CARD */}
-
-      <div className="
-        relative
-        w-full
-        max-w-[1180px]
-        rounded-[32px]
-        border
-        border-white/10
-        bg-white/[0.04]
-        backdrop-blur-3xl
-        overflow-hidden
-        shadow-2xl
-      ">
-
-        <div className="
-          absolute
+          pointer-events-none
+          fixed
           inset-0
-          bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.10),transparent_30%)]
-        "/>
+          bg-[radial-gradient(circle_at_top,rgba(0,255,255,0.15),transparent_42%)]
+        " />
 
-        <div className="
+        <section className="
+          nexus-container
           relative
           z-10
-          flex
-          flex-col
-          items-center
-          px-5
-          sm:px-8
-          py-8
+          min-h-screen
+          pt-32
+          pb-10
+          sm:pt-36
+          lg:pt-40
         ">
 
-          {/* LOGO */}
-
-          <Image
-            src="/logo.png"
-            alt="NexusnΩn.id"
-            width={900}
-            height={900}
-            priority
-            className="
-              w-[150px]
-              sm:w-[190px]
-              lg:w-[240px]
-              object-contain
-              drop-shadow-[0_0_30px_rgba(59,130,246,0.35)]
-            "
-          />
-
-          {/* TITLE */}
-
-          <h1 className="
-            mt-3
-            text-center
-            text-[30px]
-            sm:text-[46px]
-            lg:text-[62px]
-            font-black
-            leading-none
-            tracking-tight
-          ">
-
-            NexusnΩn.id
-
-          </h1>
-
-          {/* SUBTITLE */}
-
           <div className="
-            mt-4
-            max-w-[620px]
-            text-center
-            text-zinc-400
-            text-sm
-            sm:text-base
-            leading-relaxed
-          ">
-
-            {t.subtitle}
-
-          </div>
-
-          {/* ASSISTANTS */}
-
-          <div className="
-            mt-7
             flex
-            items-center
+            w-full
+            items-stretch
             gap-4
-            justify-center
-            flex-wrap
+            sm:gap-6
           ">
 
-            <button
+            <aside className="
+              w-[92px]
+              shrink-0
+              rounded-[28px]
+              border
+              border-white/10
+              bg-white/[0.035]
+              p-3
+              backdrop-blur-3xl
+              sm:w-[180px]
+              lg:w-[240px]
+              xl:w-[260px]
+            ">
 
-              onClick={()=>
-                setAssistant(
-                  "NΩNA"
-                )
-              }
-
-              className={`
-                relative
-                w-[130px]
-                h-[165px]
+              <div className="
+                hidden
+                overflow-visible
                 rounded-[24px]
                 border
-                transition-all
-                duration-300
-                overflow-hidden
+                border-cyan-400/20
+                bg-cyan-400/10
+                p-5
+                sm:block
+              ">
 
-                ${
-                  assistant === "NΩNA"
+                <img
+                  src="/logo.png"
+                  alt="NexusNON.ID"
+                  className="
+                    mx-auto
+                    h-32
+                    w-32
+                    scale-150
+                    object-contain
+                    drop-shadow-[0_0_120px_rgba(0,255,255,0.9)]
+                  "
+                />
 
-                  ? `
-                    border-pink-500/50
-                    bg-pink-500/10
-                  `
+                <h3 className="
+                  mt-5
+                  text-center
+                  text-lg
+                  font-black
+                  tracking-[-0.04em]
+                  text-white
+                ">
+                  {t("home.menu.layers")}
+                </h3>
 
-                  : `
-                    border-white/10
-                    bg-white/[0.03]
-                  `
-                }
-              `}
-            >
+              </div>
+
+              <div className="
+                grid
+                gap-2
+                sm:mt-4
+              ">
+
+                {(Object.keys(panels) as Panel[]).map(
+                  (key) => {
+
+                    const isActive =
+                      active === key
+
+                    return (
+
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() =>
+                          setActive(key)
+                        }
+                        className={`
+                          min-h-[56px]
+                          rounded-[20px]
+                          border
+                          px-2
+                          text-center
+                          transition
+                          active:scale-[0.98]
+                          sm:px-4
+                          sm:text-left
+
+                          ${
+                            isActive
+                              ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-300"
+                              : "border-white/10 bg-black/20 text-white hover:bg-white/[0.05]"
+                          }
+                        `}
+                      >
+
+                        <span className="
+                          block
+                          text-[10px]
+                          font-black
+                          uppercase
+                          leading-tight
+                          sm:text-sm
+                        ">
+                          {panels[key].menu}
+                        </span>
+
+                      </button>
+                    )
+                  }
+                )}
+
+              </div>
+
+              <div className="
+                mt-4
+                hidden
+                gap-3
+                sm:grid
+              ">
+
+                <Link
+                  href="/connect"
+                  className="
+                    nexus-primary
+                    w-full
+                    px-4
+                    text-center
+                  "
+                >
+                  {t("nav.enter")}
+                </Link>
+
+                <Link
+                  href="/dashboard"
+                  className="
+                    nexus-secondary
+                    w-full
+                    px-4
+                    text-center
+                  "
+                >
+                  {t("nav.dashboard")}
+                </Link>
+
+              </div>
+
+            </aside>
+
+            <section className="
+              relative
+              min-w-0
+              flex-1
+              overflow-hidden
+              rounded-[34px]
+              border
+              border-white/10
+              bg-white/[0.035]
+              p-5
+              backdrop-blur-3xl
+              sm:rounded-[44px]
+              sm:p-8
+              lg:p-14
+            ">
 
               <div className="
                 absolute
-                inset-0
-                bg-gradient-to-b
-                from-pink-500/10
-                to-transparent
-              "/>
+                right-[-180px]
+                top-[-180px]
+                h-[420px]
+                w-[420px]
+                rounded-full
+                bg-cyan-400/10
+                blur-[170px]
+              " />
 
               <div className="
                 relative
                 z-10
-                flex
-                flex-col
-                items-center
-                justify-center
-                h-full
               ">
 
-                <Image
-                  src="/nona.png"
-                  alt="NΩNA"
-                  width={500}
-                  height={500}
-                  className="
-                    w-[70px]
-                    object-contain
-                  "
-                />
+                <p className="
+                  text-[10px]
+                  font-black
+                  uppercase
+                  tracking-[0.25em]
+                  text-cyan-300
+                  sm:text-xs
+                  sm:tracking-[0.35em]
+                ">
+                  {t("home.badge")}
+                </p>
+
+                <h1 className="
+                  mt-5
+                  text-[clamp(2.4rem,8vw,7rem)]
+                  font-black
+                  leading-[0.88]
+                  tracking-[-0.08em]
+                ">
+                  {t("home.title")}
+                </h1>
+
+                <h2 className="
+                  mt-7
+                  max-w-[840px]
+                  text-[clamp(1.8rem,5vw,4.5rem)]
+                  font-black
+                  leading-[0.95]
+                  tracking-[-0.06em]
+                  text-cyan-100
+                ">
+                  {current.title}
+                </h2>
+
+                <p className="
+                  mt-4
+                  max-w-[820px]
+                  text-base
+                  font-semibold
+                  text-white/75
+                  sm:text-lg
+                ">
+                  {current.subtitle}
+                </p>
+
+                <p className="
+                  mt-6
+                  max-w-[820px]
+                  text-sm
+                  leading-7
+                  text-zinc-400
+                  sm:text-lg
+                  sm:leading-8
+                ">
+                  {current.text}
+                </p>
 
                 <div className="
-                  mt-3
-                  text-xl
-                  font-black
+                  mt-8
+                  grid
+                  grid-cols-1
+                  gap-4
+                  lg:grid-cols-3
                 ">
 
-                  NΩNA
+                  {current.points.map(
+                    (point, index) => (
+
+                      <div
+                        key={point}
+                        className="
+                          rounded-[24px]
+                          border
+                          border-white/10
+                          bg-black/20
+                          p-4
+                          backdrop-blur-xl
+                          sm:rounded-[28px]
+                          sm:p-5
+                        "
+                      >
+
+                        <p className="
+                          text-sm
+                          font-black
+                          text-cyan-300
+                        ">
+                          0{index + 1}
+                        </p>
+
+                        <p className="
+                          mt-3
+                          text-sm
+                          leading-6
+                          text-zinc-300
+                          sm:mt-4
+                          sm:leading-7
+                        ">
+                          {point}
+                        </p>
+
+                      </div>
+                    )
+                  )}
+
+                </div>
+
+                <div className="
+                  mt-8
+                  flex
+                  flex-col
+                  gap-3
+                  sm:flex-row
+                ">
+
+                  <Link
+                    href="/connect"
+                    className="
+                      nexus-primary
+                      w-full
+                      px-8
+                      sm:w-auto
+                    "
+                  >
+                    {t("home.cta.enter")}
+                  </Link>
+
+                  <Link
+                    href="/gateway"
+                    className="
+                      nexus-secondary
+                      w-full
+                      px-8
+                      sm:w-auto
+                    "
+                  >
+                    {t("home.cta.create")}
+                  </Link>
 
                 </div>
 
               </div>
 
-            </button>
-
-            <button
-
-              onClick={()=>
-                setAssistant(
-                  "NΩNI"
-                )
-              }
-
-              className={`
-                relative
-                w-[130px]
-                h-[165px]
-                rounded-[24px]
-                border
-                transition-all
-                duration-300
-                overflow-hidden
-
-                ${
-                  assistant === "NΩNI"
-
-                  ? `
-                    border-cyan-500/50
-                    bg-cyan-500/10
-                  `
-
-                  : `
-                    border-white/10
-                    bg-white/[0.03]
-                  `
-                }
-              `}
-            >
-
-              <div className="
-                absolute
-                inset-0
-                bg-gradient-to-b
-                from-cyan-500/10
-                to-transparent
-              "/>
-
-              <div className="
-                relative
-                z-10
-                flex
-                flex-col
-                items-center
-                justify-center
-                h-full
-              ">
-
-                <Image
-                  src="/non.png"
-                  alt="NΩNI"
-                  width={500}
-                  height={500}
-                  className="
-                    w-[70px]
-                    object-contain
-                  "
-                />
-
-                <div className="
-                  mt-3
-                  text-xl
-                  font-black
-                ">
-
-                  NΩNI
-
-                </div>
-
-              </div>
-
-            </button>
+            </section>
 
           </div>
 
-          {/* ACTIONS */}
+        </section>
 
-          <div className="
-            mt-7
-            w-full
-            max-w-[420px]
-            flex
-            flex-col
-            gap-3
-          ">
-
-            <Link
-              href="/register"
-              className="
-                h-[58px]
-                rounded-[20px]
-                bg-white
-                text-black
-                font-black
-                text-base
-                flex
-                items-center
-                justify-center
-                transition-all
-                hover:scale-[1.01]
-              "
-            >
-
-              {t.start}
-
-            </Link>
-
-            <Link
-              href="/dashboard"
-              className="
-                h-[58px]
-                rounded-[20px]
-                border
-                border-white/10
-                bg-white/[0.04]
-                text-white
-                font-black
-                text-base
-                flex
-                items-center
-                justify-center
-              "
-            >
-
-              {t.dashboard}
-
-            </Link>
-
-          </div>
-
-          {/* AI CHAT */}
-
-          <div className="
-            mt-7
-            w-full
-            max-h-[420px]
-            overflow-hidden
-          ">
-
-            <AIChat
-
-            // import AIChat from "./components/AIChat"
-              assistant={assistant}
-            />
-
-          </div>
-
-        </div>
-
-      </div>
-
-<div className="
-  fixed
-  bottom-8
-  right-8
-  z-50
-">
-
-  <button
-
-    onClick={login}
-
-    className="
-      px-8
-      py-4
-      rounded-2xl
-      bg-cyan-400
-      text-black
-      font-black
-      shadow-2xl
-      shadow-cyan-500/30
-    "
-  >
-
-    {
-
-      authenticated
-
-      ? "CONNECTED 😄🔥"
-
-      : "Connect Nexus ID"
-
-    }
-
-  </button>
-
-</div>
-
-
-    </main>
+      </main>
+    </>
   )
 }
-
