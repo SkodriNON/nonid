@@ -6,15 +6,8 @@ export const dynamic = "force-dynamic"
 const CHAIN_ID = 421614
 const NETWORK = "Arbitrum Sepolia"
 
-const RPC_URL =
-  process.env.ALCHEMY_ARBITRUM_SEPOLIA_RPC
-
-const ALCHEMY_API_KEY =
-  process.env.ALCHEMY_API_KEY
-
-if (!RPC_URL) {
-  throw new Error("Missing ALCHEMY_ARBITRUM_SEPOLIA_RPC")
-}
+const RPC_URL = process.env.ALCHEMY_ARBITRUM_SEPOLIA_RPC
+const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json(
@@ -108,24 +101,20 @@ async function getNftsForOwner(wallet: string) {
 
 export async function GET(req: NextRequest) {
   try {
-    const wallet =
-      req.nextUrl.searchParams.get("address") || ""
+    const wallet = req.nextUrl.searchParams.get("address") || ""
 
     if (!ethers.utils.isAddress(wallet)) {
       return jsonError("Invalid wallet address")
     }
 
-    const checksumWallet =
-      ethers.utils.getAddress(wallet)
+    const checksumWallet = ethers.utils.getAddress(wallet)
 
-    const nativeHex =
-      await rpcCall("eth_getBalance", [
-        checksumWallet,
-        "latest",
-      ])
+    const nativeHex = await rpcCall("eth_getBalance", [
+      checksumWallet,
+      "latest",
+    ])
 
-    const nativeRaw =
-      ethers.BigNumber.from(nativeHex)
+    const nativeRaw = ethers.BigNumber.from(nativeHex)
 
     const native = {
       type: "native",
@@ -137,102 +126,79 @@ export async function GET(req: NextRequest) {
       balance: ethers.utils.formatEther(nativeRaw),
     }
 
-    const tokenBalances =
-      await rpcCall("alchemy_getTokenBalances", [
-        checksumWallet,
-        "erc20",
-      ])
+    const tokenBalances = await rpcCall("alchemy_getTokenBalances", [
+      checksumWallet,
+      "erc20",
+    ])
 
-    const tokenRows: any[] =
-      Array.isArray(tokenBalances?.tokenBalances)
-        ? tokenBalances.tokenBalances
-        : []
+    const tokenRows: any[] = Array.isArray(tokenBalances?.tokenBalances)
+      ? tokenBalances.tokenBalances
+      : []
 
-    const nonZeroTokenRows =
-      tokenRows.filter((token) => {
+    const nonZeroTokenRows = tokenRows.filter((token) => {
+      try {
+        if (!token?.contractAddress) return false
+        if (!ethers.utils.isAddress(token.contractAddress)) return false
+        if (!token?.tokenBalance) return false
+        return !ethers.BigNumber.from(token.tokenBalance).isZero()
+      } catch {
+        return false
+      }
+    })
+
+    const tokens = await Promise.all(
+      nonZeroTokenRows.slice(0, 300).map(async (token) => {
         try {
-          if (!token?.contractAddress) return false
-          if (!ethers.utils.isAddress(token.contractAddress)) return false
-          if (!token?.tokenBalance) return false
+          const metadata = await rpcCall("alchemy_getTokenMetadata", [
+            token.contractAddress,
+          ])
 
-          return !ethers.BigNumber.from(token.tokenBalance).isZero()
+          const decimals = Number(metadata?.decimals ?? 18)
+
+          return {
+            type: "erc20",
+            name: metadata?.name || "Unknown Token",
+            symbol: metadata?.symbol || "TOKEN",
+            contractAddress: ethers.utils.getAddress(token.contractAddress),
+            decimals,
+            rawBalance: ethers.BigNumber.from(token.tokenBalance).toString(),
+            balance: formatHexBalance(token.tokenBalance, decimals),
+            logo: metadata?.logo || null,
+          }
         } catch {
-          return false
+          return null
         }
       })
+    )
 
-    const tokens =
-      await Promise.all(
-        nonZeroTokenRows.slice(0, 300).map(async (token) => {
-          try {
-            const metadata =
-              await rpcCall("alchemy_getTokenMetadata", [
-                token.contractAddress,
-              ])
+    const cleanTokens = tokens.filter(Boolean)
 
-            const decimals =
-              Number(metadata?.decimals ?? 18)
+    const nftsRaw = await getNftsForOwner(checksumWallet)
 
-            return {
-              type: "erc20",
-              name: metadata?.name || "Unknown Token",
-              symbol: metadata?.symbol || "TOKEN",
-              contractAddress:
-                ethers.utils.getAddress(token.contractAddress),
-              decimals,
-              rawBalance:
-                ethers.BigNumber.from(token.tokenBalance).toString(),
-              balance:
-                formatHexBalance(token.tokenBalance, decimals),
-              logo:
-                metadata?.logo || null,
-            }
-          } catch {
-            return null
-          }
-        })
-      )
+    const nfts = nftsRaw.map((nft: any) => ({
+      type: "nft",
+      standard: nft?.tokenType || "NFT",
+      name:
+        nft?.name ||
+        nft?.title ||
+        nft?.contract?.name ||
+        "Unnamed NFT",
+      symbol: nft?.contract?.symbol || "NFT",
+      contractAddress: nft?.contract?.address
+        ? ethers.utils.getAddress(nft.contract.address)
+        : null,
+      tokenId: nft?.tokenId || null,
+      balance: nft?.balance || "1",
+      image:
+        nft?.image?.cachedUrl ||
+        nft?.image?.pngUrl ||
+        nft?.image?.thumbnailUrl ||
+        nft?.raw?.metadata?.image ||
+        null,
+      collectionName: nft?.contract?.name || null,
+    }))
 
-    const cleanTokens =
-      tokens.filter(Boolean)
-
-    const nftsRaw =
-      await getNftsForOwner(checksumWallet)
-
-    const nfts =
-      nftsRaw.map((nft: any) => ({
-        type: "nft",
-        standard: nft?.tokenType || "NFT",
-        name:
-          nft?.name ||
-          nft?.title ||
-          nft?.contract?.name ||
-          "Unnamed NFT",
-        symbol:
-          nft?.contract?.symbol || "NFT",
-        contractAddress:
-          nft?.contract?.address
-            ? ethers.utils.getAddress(nft.contract.address)
-            : null,
-        tokenId:
-          nft?.tokenId || null,
-        balance:
-          nft?.balance || "1",
-        image:
-          nft?.image?.cachedUrl ||
-          nft?.image?.pngUrl ||
-          nft?.image?.thumbnailUrl ||
-          nft?.raw?.metadata?.image ||
-          null,
-        collectionName:
-          nft?.contract?.name || null,
-      }))
-
-    const holdings = [
-      native,
-      ...cleanTokens,
-      ...nfts,
-    ]
+    const holdings = [native, ...cleanTokens, ...nfts]
 
     return NextResponse.json({
       success: true,
