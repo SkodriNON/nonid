@@ -1,5 +1,5 @@
 import {
-  pupRequests
+  denyPupRequest
 } from "@/lib/pupRequestStore"
 
 export const runtime =
@@ -37,7 +37,7 @@ export async function POST(
     }
 
     const request =
-      pupRequests.get(id)
+      await denyPupRequest(id)
 
     if (!request) {
       return Response.json(
@@ -52,26 +52,10 @@ export async function POST(
       )
     }
 
-    const now =
-      Date.now()
-
-    request.status =
-      "denied"
-
-    request.deniedAt =
-      now
-
-    request.updatedAt =
-      now
-
-    pupRequests.set(
-      id,
-      request
-    )
-
     return Response.json({
       success: true,
-      denied: true,
+      denied:
+        request.status === "denied",
       request
     })
 

@@ -1,5 +1,5 @@
 import {
-  pupRequests
+  approvePupRequest
 } from "@/lib/pupRequestStore"
 
 export const runtime =
@@ -37,7 +37,7 @@ export async function POST(
     }
 
     const request =
-      pupRequests.get(id)
+      await approvePupRequest(id)
 
     if (!request) {
       return Response.json(
@@ -52,33 +52,10 @@ export async function POST(
       )
     }
 
-    if (request.status !== "pending") {
-      return Response.json({
-        success: true,
-        request
-      })
-    }
-
-    const now =
-      Date.now()
-
-    request.status =
-      "approved"
-
-    request.approvedAt =
-      now
-
-    request.updatedAt =
-      now
-
-    pupRequests.set(
-      id,
-      request
-    )
-
     return Response.json({
       success: true,
-      approved: true,
+      approved:
+        request.status === "approved",
       request
     })
 
