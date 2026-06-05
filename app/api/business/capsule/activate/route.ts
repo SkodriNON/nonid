@@ -4,6 +4,10 @@ import {
   getBusinessCapsuleRequest
 } from "@/lib/businessCapsuleStore"
 
+import {
+  saveBusinessCapsule
+} from "@/lib/businessCapsuleRegistry"
+
 export const runtime =
   "nodejs"
 
@@ -32,8 +36,7 @@ export async function POST(
       await req.json()
 
     const requestId =
-      String(body.requestId || "")
-        .trim()
+      String(body.requestId || "").trim()
 
     if (!requestId) {
       return Response.json(
@@ -48,9 +51,7 @@ export async function POST(
     }
 
     const request =
-      await getBusinessCapsuleRequest(
-        requestId
-      )
+      await getBusinessCapsuleRequest(requestId)
 
     if (!request) {
       return Response.json(
@@ -85,13 +86,18 @@ export async function POST(
       creatorCapsuleId: request.creatorCapsuleId,
       creatorWallet: request.creatorWallet,
       businessWallet: makeBusinessWallet(request.id),
-      status: "active",
+      status: "active" as const,
       createdAt: Date.now()
     }
 
+    const saved =
+      await saveBusinessCapsule(
+        businessCapsule
+      )
+
     return Response.json({
       success: true,
-      businessCapsule
+      businessCapsule: saved
     })
 
   } catch (error: any) {
