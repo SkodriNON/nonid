@@ -49,10 +49,10 @@ export async function POST(
           "",
         action:
           `BUSINESS_CAPSULE_APPROVAL:${businessRequest.id}`,
-        status:
-          "pending",
-        expiresAt:
-          Date.now() + 1000 * 60 * 15
+        capsuleStatus:
+          2,
+        activationRequired:
+          false
       })
     }
 
