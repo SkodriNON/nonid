@@ -54,6 +54,77 @@ function normalizePrivateKey(
     : `0x${clean}`
 }
 
+async function rpc(
+  rpcUrl: string,
+  method: string,
+  params: any[]
+) {
+  const response =
+    await fetch(
+      rpcUrl,
+      {
+        method:
+          "POST",
+        headers: {
+          "Content-Type":
+            "application/json",
+          "Accept":
+            "application/json"
+        },
+        body:
+          JSON.stringify({
+            jsonrpc:
+              "2.0",
+            id:
+              Date.now(),
+            method,
+            params
+          })
+      }
+    )
+
+  const data =
+    await response.json()
+
+  if (data.error) {
+    throw new Error(
+      data.error.message ||
+      JSON.stringify(data.error)
+    )
+  }
+
+  return data.result
+}
+
+async function waitForReceipt(
+  rpcUrl: string,
+  txHash: string
+) {
+  for (let i = 0; i < 60; i++) {
+    const receipt =
+      await rpc(
+        rpcUrl,
+        "eth_getTransactionReceipt",
+        [
+          txHash
+        ]
+      )
+
+    if (receipt) {
+      return receipt
+    }
+
+    await new Promise(
+      (resolve) =>
+        setTimeout(resolve, 2000)
+    )
+  }
+
+  throw new Error(
+    "TRANSACTION_RECEIPT_TIMEOUT"
+  )
+}
+
 export async function POST(
   req: Request
 ) {
@@ -182,30 +253,16 @@ export async function POST(
       )
     }
 
-    const provider =
-      new ethers.providers.StaticJsonRpcProvider(
-        rpcUrl,
-        {
-          name:
-            "arbitrum-sepolia",
-          chainId:
-            CHAIN_ID
-        }
-      )
-
-    const signer =
+    const wallet =
       new ethers.Wallet(
         normalizePrivateKey(
           privateKey
-        ),
-        provider
+        )
       )
 
-    const token =
-      new ethers.Contract(
-        usdtAddress,
-        ABI,
-        signer
+    const iface =
+      new ethers.utils.Interface(
+        ABI
       )
 
     const amount =
@@ -214,14 +271,112 @@ export async function POST(
         6
       )
 
-    const tx =
-      await token.mint(
-        walletAddress,
-        amount
+    const txData =
+      iface.encodeFunctionData(
+        "mint",
+        [
+          walletAddress,
+          amount
+        ]
+      )
+
+    const nonceHex =
+      await rpc(
+        rpcUrl,
+        "eth_getTransactionCount",
+        [
+          wallet.address,
+          "pending"
+        ]
+      )
+
+    const gasPriceHex =
+      await rpc(
+        rpcUrl,
+        "eth_gasPrice",
+        []
+      )
+
+    const gasPrice =
+      ethers.BigNumber
+        .from(gasPriceHex)
+        .mul(2)
+
+    const estimatedGasHex =
+      await rpc(
+        rpcUrl,
+        "eth_estimateGas",
+        [
+          {
+            from:
+              wallet.address,
+            to:
+              usdtAddress,
+            data:
+              txData,
+            value:
+              "0x0"
+          }
+        ]
+      )
+
+    const gasLimit =
+      ethers.BigNumber
+        .from(estimatedGasHex)
+        .mul(120)
+        .div(100)
+
+    const tx = {
+      to:
+        usdtAddress,
+      data:
+        txData,
+      value:
+        ethers.constants.Zero,
+      nonce:
+        ethers.BigNumber
+          .from(nonceHex)
+          .toNumber(),
+      gasPrice,
+      gasLimit,
+      chainId:
+        CHAIN_ID
+    }
+
+    const signedTx =
+      await wallet.signTransaction(
+        tx
+      )
+
+    const txHash =
+      await rpc(
+        rpcUrl,
+        "eth_sendRawTransaction",
+        [
+          signedTx
+        ]
       )
 
     const receipt =
-      await tx.wait()
+      await waitForReceipt(
+        rpcUrl,
+        txHash
+      )
+
+    if (
+      !receipt ||
+      receipt.status !== "0x1"
+    ) {
+      return json(
+        {
+          success: false,
+          message:
+            "USDT_MINT_REVERTED",
+          txHash
+        },
+        500
+      )
+    }
 
     return json({
       success: true,
@@ -235,8 +390,7 @@ export async function POST(
         "10",
       symbol:
         "mUSDT",
-      txHash:
-        receipt.transactionHash
+      txHash
     })
 
   } catch (err: any) {
