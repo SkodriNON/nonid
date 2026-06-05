@@ -181,12 +181,6 @@ export async function POST(
       body?.fullName ||
       body?.username ||
       ""
-    
-    const functionalStamp =
-  body?.functionalStamp &&
-  typeof body.functionalStamp === "object"
-    ? body.functionalStamp
-    : {}
 
     const capsuleType =
       Number(
@@ -345,21 +339,10 @@ export async function POST(
         cleanPhone
       )
 
-    const capsuleMetadata =
-  JSON.stringify({
-    name:
-      String(name),
-    functionalStamp,
-    stampedAt:
-      Date.now(),
-    stampVersion:
-      "NEXUSNON_CAPSULE_STAMP_V1"
-  })
-
-const encryptedName =
-  toEncryptedBytes(
-    capsuleMetadata
-  )
+    const encryptedName =
+      toEncryptedBytes(
+        String(name)
+      )
 
     const txData =
       iface.encodeFunctionData(
@@ -528,18 +511,17 @@ const gasPrice =
     }
 
     return json({
-  success: true,
-  existing: false,
-  txHash,
-  capsuleId,
-  capsuleWallet,
-  nftOwner:
-    capsuleWallet,
-  emailHash,
-  phoneHash,
-  antiPhishingHash,
-  functionalStamp
-})
+      success: true,
+      existing: false,
+      txHash,
+      capsuleId,
+      capsuleWallet,
+      nftOwner:
+        capsuleWallet,
+      emailHash,
+      phoneHash,
+      antiPhishingHash
+    })
 
   } catch (error: any) {
     console.error(
