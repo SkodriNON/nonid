@@ -42,6 +42,7 @@ type Tab =
   | "integrity"
   | "details"
 
+
 const GENESIS_CONTRACT =
   process.env.NEXT_PUBLIC_GENESIS_CONTRACT ||
   process.env.NEXT_PUBLIC_GENESIS_CONTRACT_ADDRESS ||
@@ -274,6 +275,11 @@ export default function CardDashboard() {
   const [capsuleId, setCapsuleId] =
     useState("0")
 
+  function openBusinessApply() {
+    router.push(
+      `/business/apply?capsuleId=${encodeURIComponent(capsuleId)}&capsuleWallet=${encodeURIComponent(wallet)}`
+    )
+  }
   const [capsuleType, setCapsuleType] =
     useState("Individual")
 
@@ -964,7 +970,16 @@ export default function CardDashboard() {
                         </span>
                       </div>
                     </div>
-                  ))}
+        ))}
+
+                  <button
+                    type="button"
+                    onClick={openBusinessApply}
+                    className="h-[56px] rounded-[20px] bg-cyan-300 font-black text-black"
+                  >
+                    Create Business Capsule
+                  </button>
+
                 </div>
               )}
 

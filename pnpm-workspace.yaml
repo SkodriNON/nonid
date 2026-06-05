@@ -1,0 +1,3 @@
+allowBuilds:
+  keccak: true
+  sharp: false
