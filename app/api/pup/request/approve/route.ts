@@ -2,6 +2,10 @@ import {
   approvePupRequest
 } from "@/lib/pupRequestStore"
 
+import {
+  voteBusinessCapsuleRequest
+} from "@/lib/businessCapsuleStore"
+
 export const runtime =
   "nodejs"
 
@@ -52,11 +56,39 @@ export async function POST(
       )
     }
 
+    let businessVote = null
+
+    if (
+      request.status === "approved" &&
+      String(request.action || "").startsWith(
+        "BUSINESS_CAPSULE_APPROVAL:"
+      )
+    ) {
+      const businessRequestId =
+        String(request.action)
+          .replace(
+            "BUSINESS_CAPSULE_APPROVAL:",
+            ""
+          )
+          .trim()
+
+      businessVote =
+        await voteBusinessCapsuleRequest({
+          requestId:
+            businessRequestId,
+          signerWallet:
+            request.wallet,
+          approve:
+            true
+        })
+    }
+
     return Response.json({
       success: true,
       approved:
         request.status === "approved",
-      request
+      request,
+      businessVote
     })
 
   } catch (err: any) {
