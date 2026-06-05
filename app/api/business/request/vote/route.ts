@@ -16,26 +16,26 @@ export async function POST(
       await req.json()
 
     const request =
-      await voteBusinessCapsuleRequest(
-        String(body.id || ""),
-        String(body.wallet || ""),
-        body.vote === "denied"
-          ? "denied"
-          : "approved"
-      )
-
-    if (!request) {
-      return Response.json(
-        {
-          success: false,
-          error:
-            "REQUEST_NOT_FOUND"
-        },
-        {
-          status: 404
-        }
-      )
-    }
+      await voteBusinessCapsuleRequest({
+        requestId:
+          String(
+            body.requestId ||
+            body.id ||
+            ""
+          ),
+        signerWallet:
+          String(
+            body.signerWallet ||
+            body.wallet ||
+            ""
+          ),
+        approve:
+          body.vote === "denied"
+            ? false
+            : body.approve === false
+              ? false
+              : true
+      })
 
     return Response.json({
       success: true,
