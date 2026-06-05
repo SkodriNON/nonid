@@ -309,9 +309,56 @@ export default function NexusIdentityGateway() {
         "OTP send failed"
       )
 
-    } finally {
+        } finally {
 
       setOtpLoading(false)
+    }
+  }
+
+  function getCapsuleFunctionalStamp() {
+
+    if (capsuleType === 0) {
+      return {
+        profile: "INDIVIDUAL",
+        canVote: true,
+        governancePower: true,
+        businessPower: false,
+        developerPower: false,
+        canCreateBusiness: true,
+        canAuthorizeBusiness: true,
+        votingWeight: 1
+      }
+    }
+
+    if (capsuleType === 1) {
+      return {
+        profile: "DEVELOPER",
+        canVote: false,
+        governancePower: false,
+        businessPower: false,
+        developerPower: true,
+        canDeployModules: true,
+        canRequestBusinessAuthorization: true,
+        canPublishContracts: true,
+        auditRequired: true,
+        votingWeight: 0
+      }
+    }
+
+    return {
+      profile: "BUSINESS",
+      canVote: false,
+      governancePower: false,
+      businessPower: true,
+      developerPower: false,
+      canCreateInternalWallets: true,
+      canAuthorizeDevelopers: true,
+      canCreateBusinessToken: true,
+      canCreateLiquidity: true,
+      canCreateTreasury: true,
+      canCreateBoard: true,
+      auditRequired: true,
+      votingWeight: 0
     }
   }
 
@@ -353,20 +400,23 @@ export default function NexusIdentityGateway() {
               "application/json"
           },
           body: JSON.stringify({
-            email:
-              emailValue.trim(),
+  email:
+    emailValue.trim(),
 
-            phone:
-              phone.trim(),
+  phone:
+    phone.trim(),
 
-            name:
-              nameValue.trim(),
+  name:
+    nameValue.trim(),
 
-            capsuleType,
+  capsuleType,
 
-            antiPhishing:
-              viewPin.trim()
-          })
+  functionalStamp:
+    getCapsuleFunctionalStamp(),
+
+  antiPhishing:
+    viewPin.trim()
+})
         }
       )
 
