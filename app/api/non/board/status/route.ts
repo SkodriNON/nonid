@@ -39,7 +39,14 @@ export async function GET() {
 
     const provider =
   new ethers.providers.JsonRpcProvider(
-    RPC_URL
+    {
+      url: RPC_URL,
+      skipFetchSetup: true
+    },
+    {
+      name: "arbitrum-sepolia",
+      chainId: 421614
+    }
   )
 
     const activation =
