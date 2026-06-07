@@ -152,6 +152,11 @@ export async function POST(
         `
       })
 
+    console.log(
+  "RESEND RESULT:",
+  JSON.stringify(result, null, 2)
+)
+
     return Response.json({
       success: true,
       message:
