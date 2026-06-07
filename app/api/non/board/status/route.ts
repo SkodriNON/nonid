@@ -41,9 +41,9 @@ export async function GET() {
     }
 
     const provider =
-      new ethers.JsonRpcProvider(
-        RPC_URL
-      )
+  new ethers.providers.JsonRpcProvider(
+    RPC_URL
+  )
 
     const activation =
       new ethers.Contract(
