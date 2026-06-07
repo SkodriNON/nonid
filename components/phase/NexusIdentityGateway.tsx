@@ -273,7 +273,7 @@ export default function NexusIdentityGateway() {
 
       const response =
         await fetch(
-          "/api/send-otp",
+          "/api/send-email-otp",
           {
             method: "POST",
             headers: {
@@ -479,35 +479,36 @@ export default function NexusIdentityGateway() {
       setMintError("")
 
       const phoneOtp =
-        getOtpValue(phoneOtpRefs)
+  getOtpValue(phoneOtpRefs)
 
-      if (
-        phoneOtp.length !== 6
-      ) {
-        setMintError(
-          "Please enter phone OTP"
-        )
+if (
+  phoneOtp.length !== 6
+) {
+  setMintError(
+    "Please enter email OTP"
+  )
 
-        return
-      }
+  return
+}
 
-      const response =
-        await fetch(
-          "/api/verify-otp",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json"
-            },
-            body: JSON.stringify({
-              phone,
-              email:
-                emailValue.trim(),
-              phoneOtp
-            })
-          }
-        )
+const response =
+  await fetch(
+    "/api/verify-otp",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type":
+          "application/json"
+      },
+      body: JSON.stringify({
+        phone,
+        email:
+          emailValue.trim(),
+        emailOtp:
+          phoneOtp
+      })
+    }
+  )
 
       const data =
         await response.json()
