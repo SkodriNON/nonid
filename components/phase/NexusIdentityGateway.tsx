@@ -295,7 +295,7 @@ export default function NexusIdentityGateway() {
 
         setOtpError(
           data.message ||
-          "OTP send failed"
+          "Email OTP send failed"
         )
 
         return
@@ -934,10 +934,10 @@ setTimeout(() => {
                     className="mt-3 h-[50px] w-full rounded-[16px] border border-cyan-400/20 bg-cyan-400/10 font-bold text-cyan-300 transition active:scale-[0.98] hover:bg-cyan-400/20 disabled:opacity-50"
                   >
                     {otpLoading
-                      ? "Sending..."
-                      : otpSent
-                      ? "OTP Sent"
-                      : "Send OTP"}
+  ? "Sending Email..."
+  : otpSent
+  ? "Email OTP Sent"
+  : "Send Email OTP"}
                   </button>
 
                   {otpError && (
@@ -953,7 +953,7 @@ setTimeout(() => {
                 <div>
 
                   <label className="mb-2 block text-[11px] font-semibold tracking-[0.22em] text-zinc-300">
-                    Phone OTP
+                    Email OTP
                   </label>
 
                   <div className="grid grid-cols-6 gap-2">
