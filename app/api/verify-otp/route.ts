@@ -11,9 +11,17 @@ export const dynamic =
 function normalizePhone(
   phone: string
 ) {
-  return phone
+  return String(phone || "")
     .trim()
     .replace(/\s+/g, "")
+}
+
+function normalizeEmail(
+  email: string
+) {
+  return String(email || "")
+    .trim()
+    .toLowerCase()
 }
 
 export async function POST(
@@ -28,20 +36,27 @@ export async function POST(
         ? normalizePhone(body.phone)
         : ""
 
+    const email =
+      body?.email
+        ? normalizeEmail(body.email)
+        : ""
+
     const otp =
       String(
         body?.otp ||
         body?.phoneOtp ||
+        body?.emailOtp ||
         body?.code ||
         body?.verificationCode ||
         ""
       ).trim()
 
-    if (!phone) {
+    if (!phone && !email) {
       return Response.json({
         success: false,
         verified: false,
-        error: "PHONE_REQUIRED"
+        error:
+          "PHONE_OR_EMAIL_REQUIRED"
       })
     }
 
@@ -49,25 +64,62 @@ export async function POST(
       return Response.json({
         success: false,
         verified: false,
-        error: "OTP_REQUIRED"
+        error:
+          "OTP_REQUIRED"
       })
     }
 
-    const session =
-      otpStore.get(phone)
+    const keys =
+      email && phone
+        ? [
+            `${phone}:${email}`,
+            phone,
+            email
+          ]
+        : email
+          ? [
+              email
+            ]
+          : [
+              phone
+            ]
+
+    let session: any = null
+    let usedKey = ""
+
+    for (const key of keys) {
+      const found =
+        otpStore.get(key)
+
+      if (found) {
+        session = found
+        usedKey = key
+        break
+      }
+    }
 
     console.log("VERIFY OTP:", {
       phone,
-      received: otp,
-      stored: session?.otp,
-      hasSession: Boolean(session)
+      email,
+      received:
+        otp,
+      usedKey,
+      hasSession:
+        Boolean(session),
+      hasOtp:
+        Boolean(session?.otp),
+      hasPhoneOtp:
+        Boolean(session?.phoneOtp),
+      hasEmailOtp:
+        Boolean(session?.emailOtp)
     })
 
     if (!session) {
       return Response.json({
         success: false,
         verified: false,
-        error: "OTP_SESSION_NOT_FOUND"
+        error:
+          "OTP_SESSION_NOT_FOUND"
       })
     }
 
@@ -75,31 +127,44 @@ export async function POST(
       Date.now() >
       session.expires
     ) {
-      otpStore.delete(phone)
+      otpStore.delete(usedKey)
 
       return Response.json({
         success: false,
         verified: false,
-        error: "OTP_EXPIRED"
+        error:
+          "OTP_EXPIRED"
       })
     }
 
+    const validOtps = [
+      session.otp,
+      session.phoneOtp,
+      session.emailOtp
+    ]
+      .filter(Boolean)
+      .map((value) =>
+        String(value).trim()
+      )
+
     if (
-      String(session.otp).trim() !== otp
+      !validOtps.includes(otp)
     ) {
       return Response.json({
         success: false,
         verified: false,
-        error: "INVALID_OTP"
+        error:
+          "INVALID_OTP"
       })
     }
 
-    otpStore.delete(phone)
+    otpStore.delete(usedKey)
 
     return Response.json({
       success: true,
       verified: true,
-      message: "OTP verified"
+      message:
+        "OTP verified"
     })
 
   } catch (error: any) {
