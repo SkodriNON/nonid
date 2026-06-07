@@ -1,5 +1,6 @@
-import { Resend }
-from "resend"
+import {
+  Resend
+} from "resend"
 
 import {
   generateOtp
@@ -9,38 +10,101 @@ import {
   otpStore
 } from "@/lib/otpStore"
 
+export const runtime =
+  "nodejs"
+
+export const dynamic =
+  "force-dynamic"
+
 const resend =
   new Resend(
-    process.env
-      .RESEND_API_KEY
+    process.env.RESEND_API_KEY
   )
+
+function normalizeEmail(
+  email: string
+) {
+  return String(email || "")
+    .trim()
+    .toLowerCase()
+}
+
+function normalizePhone(
+  phone: string
+) {
+  return String(phone || "")
+    .trim()
+    .replace(/\s+/g, "")
+}
+
+function isValidEmail(
+  email: string
+) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    email
+  )
+}
 
 export async function POST(
   req: Request
 ) {
   try {
-
     const body =
       await req.json()
 
-    const {
-      phone,
-      email
-    } = body
+    const phone =
+      normalizePhone(
+        body?.phone || ""
+      )
 
-    if (
-      !phone ||
-      !email
-    ) {
-      return Response.json({
-        success: false,
-        message:
-          "Phone and email required"
-      })
+    const email =
+      normalizeEmail(
+        body?.email || ""
+      )
+
+    if (!email) {
+      return Response.json(
+        {
+          success: false,
+          error:
+            "EMAIL_REQUIRED"
+        },
+        {
+          status: 400
+        }
+      )
+    }
+
+    if (!isValidEmail(email)) {
+      return Response.json(
+        {
+          success: false,
+          error:
+            "INVALID_EMAIL"
+        },
+        {
+          status: 400
+        }
+      )
+    }
+
+    if (!process.env.RESEND_API_KEY) {
+      return Response.json(
+        {
+          success: false,
+          error:
+            "RESEND_API_KEY_MISSING"
+        },
+        {
+          status: 500
+        }
+      )
     }
 
     const key =
-      `${phone}:${email}`
+      phone
+        ? `${phone}:${email}`
+        : email
 
     const existing =
       otpStore.get(key)
@@ -61,53 +125,55 @@ export async function POST(
       }
     )
 
-    console.log(
-      "EMAIL OTP:",
-      emailOtp
-    )
+    const from =
+      process.env.RESEND_FROM_EMAIL ||
+      "NexusNON.ID <onboarding@resend.dev>"
 
     const result =
       await resend.emails.send({
-        from:
-          "NexusnΩn <onboarding@resend.dev>",
-
+        from,
         to:
           email,
-
         subject:
-          "Your NexusnΩn Verification Code",
-
+          "Your NexusNON.ID verification code",
         html: `
-          <div style="font-family:sans-serif;padding:30px;background:black;color:white">
-            <h1>NexusNON.ID</h1>
-            <p>Your verification code:</p>
-            <h2>${emailOtp}</h2>
+          <div style="font-family:Arial,sans-serif;padding:28px;background:#020617;color:#ffffff;border-radius:20px">
+            <h1 style="margin:0 0 12px;font-size:28px">NexusNON.ID</h1>
+            <p style="color:#94a3b8;font-size:15px;line-height:1.6">
+              Your verification code is:
+            </p>
+            <div style="font-size:36px;font-weight:800;letter-spacing:8px;margin:24px 0;color:#67e8f9">
+              ${emailOtp}
+            </div>
+            <p style="color:#64748b;font-size:13px">
+              This code expires in 5 minutes.
+            </p>
           </div>
         `
       })
 
-    console.log(
-      "RESEND RESULT:",
-      result
-    )
-
     return Response.json({
       success: true,
       message:
-        "Email OTP sent"
+        "EMAIL_OTP_SENT",
+      id:
+        (result as any)?.data?.id ||
+        null
     })
 
-  } catch (error) {
-
-    console.error(
-      "SEND EMAIL OTP ERROR:",
-      error
+  } catch (error: any) {
+    return Response.json(
+      {
+        success: false,
+        error:
+          "EMAIL_OTP_FAILED",
+        message:
+          error?.message ||
+          "Email OTP failed"
+      },
+      {
+        status: 500
+      }
     )
-
-    return Response.json({
-      success: false,
-      message:
-        "Email OTP failed"
-    })
   }
 }
