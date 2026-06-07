@@ -9,9 +9,6 @@ export const dynamic =
   "force-dynamic"
 
 const RPC_URL =
-  process.env.NEXT_PUBLIC_ARBITRUM_RPC ||
-  process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC ||
-  process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC_URL ||
   "https://sepolia-rollup.arbitrum.io/rpc"
 
 const ACTIVATION =
