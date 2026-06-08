@@ -43,9 +43,12 @@ function getEnv(
 function normalizePrivateKey(
   key: string
 ) {
-  return key.startsWith("0x")
-    ? key
-    : `0x${key}`
+  const clean =
+    key.trim()
+
+  return clean.startsWith("0x")
+    ? clean
+    : `0x${clean}`
 }
 
 async function rpc(
@@ -57,17 +60,21 @@ async function rpc(
     await fetch(
       rpcUrl,
       {
-        method: "POST",
+        method:
+          "POST",
         headers: {
           "Content-Type":
             "application/json"
         },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: Date.now(),
-          method,
-          params
-        })
+        body:
+          JSON.stringify({
+            jsonrpc:
+              "2.0",
+            id:
+              Date.now(),
+            method,
+            params
+          })
       }
     )
 
@@ -93,7 +100,9 @@ async function waitForReceipt(
       await rpc(
         rpcUrl,
         "eth_getTransactionReceipt",
-        [txHash]
+        [
+          txHash
+        ]
       )
 
     if (receipt) {
@@ -126,17 +135,17 @@ export async function POST(
     const pinProofHash =
       String(
         body.pinProofHash || ""
-      )
+      ).trim()
 
     const pukProofHash =
       String(
         body.pukProofHash || ""
-      )
+      ).trim()
 
     const pupProofHash =
       String(
         body.pupProofHash || ""
-      )
+      ).trim()
 
     const contractAddress =
       getEnv([
@@ -149,12 +158,16 @@ export async function POST(
       getEnv([
         "ARBITRUM_SEPOLIA_RPC_URL",
         "NETWORK_RPC",
-        "NEXT_PUBLIC_RPC_URL"
+        "NEXT_PUBLIC_RPC_URL",
+        "NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC",
+        "NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC_URL",
+        "NEXT_PUBLIC_ARBITRUM_RPC"
       ])
 
     const privateKey =
       getEnv([
-        "OPERATOR_PRIVATE_KEY"
+        "OPERATOR_PRIVATE_KEY",
+        "PRIVATE_KEY"
       ])
 
     if (
@@ -167,9 +180,51 @@ export async function POST(
         {
           success: false,
           message:
-            "INVALID_INPUT"
+            "INVALID_INPUT",
+          debug: {
+            capsuleId,
+            hasPinProofHash:
+              Boolean(pinProofHash),
+            hasPukProofHash:
+              Boolean(pukProofHash),
+            hasPupProofHash:
+              Boolean(pupProofHash)
+          }
         },
         400
+      )
+    }
+
+    if (!contractAddress) {
+      return json(
+        {
+          success: false,
+          message:
+            "GENESIS_CONTRACT_MISSING"
+        },
+        500
+      )
+    }
+
+    if (!rpcUrl) {
+      return json(
+        {
+          success: false,
+          message:
+            "RPC_URL_MISSING"
+        },
+        500
+      )
+    }
+
+    if (!privateKey) {
+      return json(
+        {
+          success: false,
+          message:
+            "OPERATOR_PRIVATE_KEY_MISSING"
+        },
+        500
       )
     }
 
@@ -197,7 +252,7 @@ export async function POST(
         ]
       )
 
-    const nonce =
+    const nonceHex =
       await rpc(
         rpcUrl,
         "eth_getTransactionCount",
@@ -207,18 +262,19 @@ export async function POST(
         ]
       )
 
+    const gasPriceHex =
+      await rpc(
+        rpcUrl,
+        "eth_gasPrice",
+        []
+      )
+
     const gasPrice =
       ethers.BigNumber
-        .from(
-          await rpc(
-            rpcUrl,
-            "eth_gasPrice",
-            []
-          )
-        )
+        .from(gasPriceHex)
         .mul(2)
 
-    const gasEstimate =
+    const estimatedGasHex =
       await rpc(
         rpcUrl,
         "eth_estimateGas",
@@ -229,31 +285,34 @@ export async function POST(
             to:
               contractAddress,
             data:
-              txData
+              txData,
+            value:
+              "0x0"
           }
         ]
       )
+
+    const gasLimit =
+      ethers.BigNumber
+        .from(estimatedGasHex)
+        .mul(120)
+        .div(100)
 
     const tx = {
       to:
         contractAddress,
       data:
         txData,
-      value: 0,
-      chainId:
-        CHAIN_ID,
+      value:
+        ethers.constants.Zero,
       nonce:
         ethers.BigNumber
-          .from(nonce)
+          .from(nonceHex)
           .toNumber(),
       gasPrice,
-      gasLimit:
-        ethers.BigNumber
-          .from(
-            gasEstimate
-          )
-          .mul(120)
-          .div(100)
+      gasLimit,
+      chainId:
+        CHAIN_ID
     }
 
     const signed =
@@ -265,7 +324,9 @@ export async function POST(
       await rpc(
         rpcUrl,
         "eth_sendRawTransaction",
-        [signed]
+        [
+          signed
+        ]
       )
 
     const receipt =
@@ -275,8 +336,8 @@ export async function POST(
       )
 
     if (
-      receipt.status !==
-      "0x1"
+      !receipt ||
+      receipt.status !== "0x1"
     ) {
       return json(
         {

@@ -16,8 +16,7 @@ type Panel =
   | "roadmap"
 
 export default function Page() {
-  const { t } =
-    useLanguage()
+  const { t } = useLanguage()
 
   const [active, setActive] =
     useState<Panel>("vision")
@@ -72,8 +71,7 @@ export default function Page() {
     }
   }
 
-  const current =
-    panels[active]
+  const current = panels[active]
 
   return (
     <>
@@ -89,7 +87,7 @@ export default function Page() {
           pointer-events-none
           fixed
           inset-0
-          bg-[radial-gradient(circle_at_top,rgba(0,255,255,0.15),transparent_42%)]
+          bg-[radial-gradient(circle_at_top,rgba(0,255,255,0.10),transparent_40%)]
         " />
 
         <section className="
@@ -98,68 +96,62 @@ export default function Page() {
           z-10
           min-h-screen
           px-4
-          pt-28
+          pt-24
           pb-8
           sm:px-6
-          sm:pt-32
+          sm:pt-28
           lg:px-8
-          lg:pt-40
+          lg:pt-32
         ">
           <div className="
+            mx-auto
             flex
             w-full
+            max-w-[1280px]
             flex-col
             gap-4
-            sm:gap-6
             lg:flex-row
             lg:items-stretch
           ">
             <aside className="
               w-full
               shrink-0
-              rounded-[28px]
+              rounded-2xl
               border
               border-white/10
               bg-white/[0.035]
               p-3
-              backdrop-blur-3xl
-              sm:p-4
-              lg:w-[240px]
-              xl:w-[260px]
+              backdrop-blur-2xl
+              lg:w-[200px]
             ">
               <div className="
-                rounded-[24px]
+                rounded-xl
                 border
                 border-cyan-400/20
                 bg-cyan-400/10
                 p-4
-                sm:p-5
               ">
                 <img
                   src="/logo.png"
                   alt="NexusNON.ID"
                   className="
                     mx-auto
-                    h-24
-                    w-24
+                    h-20
+                    w-20
                     object-contain
-                    drop-shadow-[0_0_90px_rgba(0,255,255,0.75)]
-                    sm:h-28
-                    sm:w-28
-                    lg:h-32
-                    lg:w-32
-                    lg:scale-125
+                    drop-shadow-[0_0_40px_rgba(0,255,255,0.55)]
+                    lg:h-24
+                    lg:w-24
                   "
                 />
 
                 <h3 className="
-                  mt-4
+                  mt-3
                   text-center
-                  text-base
-                  font-black
-                  tracking-[-0.04em]
+                  text-sm
+                  font-bold
+                  tracking-[-0.02em]
                   text-white
-                  sm:text-lg
                 ">
                   {t("home.menu.layers")}
                 </h3>
@@ -185,8 +177,8 @@ export default function Page() {
                           setActive(key)
                         }
                         className={`
-                          min-h-[54px]
-                          rounded-[18px]
+                          min-h-[42px]
+                          rounded-xl
                           border
                           px-3
                           text-center
@@ -204,11 +196,10 @@ export default function Page() {
                         <span className="
                           block
                           text-[10px]
-                          font-black
+                          font-bold
                           uppercase
                           leading-tight
                           sm:text-xs
-                          lg:text-sm
                         ">
                           {panels[key].menu}
                         </span>
@@ -222,9 +213,7 @@ export default function Page() {
                 mt-4
                 grid
                 grid-cols-1
-                gap-3
-                sm:grid-cols-2
-                lg:grid-cols-1
+                gap-2
               ">
                 <Link
                   href="/connect"
@@ -233,6 +222,7 @@ export default function Page() {
                     w-full
                     px-4
                     text-center
+                    text-xs
                   "
                 >
                   {t("nav.enter")}
@@ -245,6 +235,7 @@ export default function Page() {
                     w-full
                     px-4
                     text-center
+                    text-xs
                   "
                 >
                   {t("nav.dashboard")}
@@ -258,26 +249,24 @@ export default function Page() {
               min-w-0
               flex-1
               overflow-hidden
-              rounded-[28px]
+              rounded-2xl
               border
               border-white/10
               bg-white/[0.035]
               p-5
-              backdrop-blur-3xl
-              sm:rounded-[36px]
-              sm:p-8
-              lg:rounded-[44px]
-              lg:p-14
+              backdrop-blur-2xl
+              sm:p-6
+              lg:p-8
             ">
               <div className="
                 absolute
-                right-[-180px]
-                top-[-180px]
-                h-[420px]
-                w-[420px]
+                right-[-160px]
+                top-[-160px]
+                h-[360px]
+                w-[360px]
                 rounded-full
                 bg-cyan-400/10
-                blur-[170px]
+                blur-[140px]
               " />
 
               <div className="
@@ -286,67 +275,69 @@ export default function Page() {
               ">
                 <p className="
                   text-[10px]
-                  font-black
+                  font-bold
                   uppercase
                   tracking-[0.22em]
                   text-cyan-300
-                  sm:text-xs
-                  sm:tracking-[0.35em]
                 ">
                   {t("home.badge")}
                 </p>
 
                 <h1 className="
-                  mt-5
-                  text-[clamp(2.3rem,11vw,7rem)]
+                  mt-4
+                  text-4xl
                   font-black
-                  leading-[0.9]
-                  tracking-[-0.08em]
+                  leading-none
+                  tracking-[-0.05em]
+                  sm:text-5xl
+                  xl:text-6xl
                 ">
                   {t("home.title")}
                 </h1>
 
                 <h2 className="
-                  mt-7
-                  max-w-[840px]
-                  text-[clamp(1.7rem,7vw,4.5rem)]
+                  mt-5
+                  max-w-[850px]
+                  text-2xl
                   font-black
-                  leading-[0.98]
-                  tracking-[-0.06em]
+                  leading-tight
+                  tracking-[-0.04em]
                   text-cyan-100
+                  sm:text-3xl
+                  xl:text-4xl
                 ">
                   {current.title}
                 </h2>
 
                 <p className="
                   mt-4
-                  max-w-[820px]
+                  max-w-[760px]
                   text-sm
                   font-semibold
-                  leading-7
+                  leading-6
                   text-white/75
-                  sm:text-lg
+                  sm:text-base
                 ">
                   {current.subtitle}
                 </p>
 
                 <p className="
-                  mt-6
-                  max-w-[820px]
+                  mt-4
+                  max-w-[760px]
                   text-sm
-                  leading-7
+                  leading-6
                   text-zinc-400
-                  sm:text-lg
-                  sm:leading-8
+                  sm:text-base
+                  sm:leading-7
                 ">
                   {current.text}
                 </p>
 
                 <div className="
-                  mt-8
+                  mt-6
                   grid
                   grid-cols-1
-                  gap-4
+                  gap-3
                   md:grid-cols-3
                 ">
                   {current.points.map(
@@ -354,18 +345,16 @@ export default function Page() {
                       <div
                         key={point}
                         className="
-                          rounded-[24px]
+                          rounded-xl
                           border
                           border-white/10
                           bg-black/20
                           p-4
                           backdrop-blur-xl
-                          sm:rounded-[28px]
-                          sm:p-5
                         "
                       >
                         <p className="
-                          text-sm
+                          text-xs
                           font-black
                           text-cyan-300
                         ">
@@ -377,8 +366,6 @@ export default function Page() {
                           text-sm
                           leading-6
                           text-zinc-300
-                          sm:mt-4
-                          sm:leading-7
                         ">
                           {point}
                         </p>
@@ -388,7 +375,7 @@ export default function Page() {
                 </div>
 
                 <div className="
-                  mt-8
+                  mt-6
                   flex
                   flex-col
                   gap-3
@@ -399,8 +386,9 @@ export default function Page() {
                     className="
                       nexus-primary
                       w-full
-                      px-8
+                      px-6
                       text-center
+                      text-xs
                       sm:w-auto
                     "
                   >
@@ -412,8 +400,9 @@ export default function Page() {
                     className="
                       nexus-secondary
                       w-full
-                      px-8
+                      px-6
                       text-center
+                      text-xs
                       sm:w-auto
                     "
                   >

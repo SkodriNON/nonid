@@ -1,113 +1,95 @@
-import { Resend }
-from "resend"
+import { Resend } from "resend"
 
-import {
-  generateOtp
-} from "@/lib/generateOtp"
+import { generateOtp } from "@/lib/generateOtp"
+import { otpStore } from "@/lib/otpStore"
 
-import {
-  otpStore
-} from "@/lib/otpStore"
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
-const resend =
-  new Resend(
-    process.env
-      .RESEND_API_KEY
-  )
+const resend = new Resend(
+  process.env.RESEND_API_KEY
+)
 
-export async function POST(
-  req: Request
-) {
+function normalizeEmail(email: string) {
+  return String(email || "").trim().toLowerCase()
+}
+
+function normalizePhone(phone: string) {
+  return String(phone || "").trim().replace(/\s+/g, "")
+}
+
+export async function POST(req: Request) {
   try {
+    const body = await req.json()
 
-    const body =
-      await req.json()
+    const phone = normalizePhone(body?.phone || "")
+    const email = normalizeEmail(body?.email || "")
 
-    const {
-      phone,
-      email
-    } = body
-
-    if (
-      !phone ||
-      !email
-    ) {
-      return Response.json({
-        success: false,
-        message:
-          "Phone and email required"
-      })
+    if (!phone || !email) {
+      return Response.json(
+        {
+          success: false,
+          message: "PHONE_AND_EMAIL_REQUIRED"
+        },
+        { status: 400 }
+      )
     }
 
-    const key =
-      `${phone}:${email}`
+    if (!process.env.RESEND_API_KEY) {
+      return Response.json(
+        {
+          success: false,
+          message: "RESEND_API_KEY_MISSING"
+        },
+        { status: 500 }
+      )
+    }
 
-    const existing =
-      otpStore.get(key)
+    const from =
+      process.env.RESEND_FROM_EMAIL ||
+      "NexusNON.ID <verify@skodrinon.com>"
 
-    const emailOtp =
-      generateOtp()
+    const key = `${phone}:${email}`
 
-    otpStore.set(
-      key,
-      {
-        phoneOtp:
-          existing?.phoneOtp || "",
-        emailOtp,
-        expires:
-          Date.now() +
-          5 * 60 * 1000,
-        email
-      }
-    )
+    const existing = otpStore.get(key)
 
-    console.log(
-      "EMAIL OTP:",
-      emailOtp
-    )
+    const emailOtp = generateOtp()
 
-    const result =
-      await resend.emails.send({
-        from:
-          "NexusnΩn <onboarding@resend.dev>",
+    otpStore.set(key, {
+      phoneOtp: existing?.phoneOtp || "",
+      emailOtp,
+      expires: Date.now() + 5 * 60 * 1000,
+      email
+    })
 
-        to:
-          email,
-
-        subject:
-          "Your NexusnΩn Verification Code",
-
-        html: `
-          <div style="font-family:sans-serif;padding:30px;background:black;color:white">
-            <h1>NexusNON.ID</h1>
-            <p>Your verification code:</p>
-            <h2>${emailOtp}</h2>
-          </div>
-        `
-      })
-
-    console.log(
-      "RESEND RESULT:",
-      result
-    )
+    const result = await resend.emails.send({
+      from,
+      to: email,
+      subject: "Your NexusNON.ID Verification Code",
+      html: `
+        <div style="font-family:Arial,sans-serif;padding:30px;background:#020617;color:white;border-radius:18px">
+          <h1 style="margin:0 0 12px">NexusNON.ID</h1>
+          <p>Your verification code:</p>
+          <h2 style="font-size:36px;letter-spacing:8px;color:#67e8f9">${emailOtp}</h2>
+          <p style="color:#94a3b8">This code expires in 5 minutes.</p>
+        </div>
+      `
+    })
 
     return Response.json({
       success: true,
-      message:
-        "Email OTP sent"
+      message: "EMAIL_OTP_SENT",
+      id: (result as any)?.data?.id || null
     })
+  } catch (error: any) {
+    console.error("SEND_EMAIL_OTP_ERROR:", error)
 
-  } catch (error) {
-
-    console.error(
-      "SEND EMAIL OTP ERROR:",
-      error
+    return Response.json(
+      {
+        success: false,
+        message: error?.message || "EMAIL_OTP_FAILED"
+      },
+      { status: 500 }
     )
-
-    return Response.json({
-      success: false,
-      message:
-        "Email OTP failed"
-    })
   }
 }

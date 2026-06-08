@@ -414,11 +414,11 @@ export default function PupPage() {
       )
 
     const pupProofHash =
-      ethers.utils.keccak256(
-        ethers.utils.toUtf8Bytes(
-          `PUP:${request.capsuleId}:${request.wallet}:${Date.now()}`
-        )
-      )
+  ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes(
+      `PUP:${request.capsuleId}:${request.wallet}:${Date.now()}`
+    )
+  )
 
     const activationResponse =
       await fetch(
