@@ -16,7 +16,6 @@ type Panel =
   | "roadmap"
 
 export default function Page() {
-
   const { t } =
     useLanguage()
 
@@ -83,10 +82,9 @@ export default function Page() {
       <main className="
         nexus-page
         min-h-screen
-        overflow-hidden
+        overflow-x-hidden
         text-white
       ">
-
         <div className="
           pointer-events-none
           fixed
@@ -99,22 +97,25 @@ export default function Page() {
           relative
           z-10
           min-h-screen
-          pt-32
-          pb-10
-          sm:pt-36
+          px-4
+          pt-28
+          pb-8
+          sm:px-6
+          sm:pt-32
+          lg:px-8
           lg:pt-40
         ">
-
           <div className="
             flex
             w-full
-            items-stretch
+            flex-col
             gap-4
             sm:gap-6
+            lg:flex-row
+            lg:items-stretch
           ">
-
             <aside className="
-              w-[92px]
+              w-full
               shrink-0
               rounded-[28px]
               border
@@ -122,62 +123,61 @@ export default function Page() {
               bg-white/[0.035]
               p-3
               backdrop-blur-3xl
-              sm:w-[180px]
+              sm:p-4
               lg:w-[240px]
               xl:w-[260px]
             ">
-
               <div className="
-                hidden
-                overflow-visible
                 rounded-[24px]
                 border
                 border-cyan-400/20
                 bg-cyan-400/10
-                p-5
-                sm:block
+                p-4
+                sm:p-5
               ">
-
                 <img
                   src="/logo.png"
                   alt="NexusNON.ID"
                   className="
                     mx-auto
-                    h-32
-                    w-32
-                    scale-150
+                    h-24
+                    w-24
                     object-contain
-                    drop-shadow-[0_0_120px_rgba(0,255,255,0.9)]
+                    drop-shadow-[0_0_90px_rgba(0,255,255,0.75)]
+                    sm:h-28
+                    sm:w-28
+                    lg:h-32
+                    lg:w-32
+                    lg:scale-125
                   "
                 />
 
                 <h3 className="
-                  mt-5
+                  mt-4
                   text-center
-                  text-lg
+                  text-base
                   font-black
                   tracking-[-0.04em]
                   text-white
+                  sm:text-lg
                 ">
                   {t("home.menu.layers")}
                 </h3>
-
               </div>
 
               <div className="
+                mt-4
                 grid
+                grid-cols-2
                 gap-2
-                sm:mt-4
+                lg:grid-cols-1
               ">
-
                 {(Object.keys(panels) as Panel[]).map(
                   (key) => {
-
                     const isActive =
                       active === key
 
                     return (
-
                       <button
                         key={key}
                         type="button"
@@ -185,15 +185,14 @@ export default function Page() {
                           setActive(key)
                         }
                         className={`
-                          min-h-[56px]
-                          rounded-[20px]
+                          min-h-[54px]
+                          rounded-[18px]
                           border
-                          px-2
+                          px-3
                           text-center
                           transition
                           active:scale-[0.98]
-                          sm:px-4
-                          sm:text-left
+                          lg:text-left
 
                           ${
                             isActive
@@ -202,32 +201,31 @@ export default function Page() {
                           }
                         `}
                       >
-
                         <span className="
                           block
                           text-[10px]
                           font-black
                           uppercase
                           leading-tight
-                          sm:text-sm
+                          sm:text-xs
+                          lg:text-sm
                         ">
                           {panels[key].menu}
                         </span>
-
                       </button>
                     )
                   }
                 )}
-
               </div>
 
               <div className="
                 mt-4
-                hidden
+                grid
+                grid-cols-1
                 gap-3
-                sm:grid
+                sm:grid-cols-2
+                lg:grid-cols-1
               ">
-
                 <Link
                   href="/connect"
                   className="
@@ -251,27 +249,26 @@ export default function Page() {
                 >
                   {t("nav.dashboard")}
                 </Link>
-
               </div>
-
             </aside>
 
             <section className="
               relative
+              w-full
               min-w-0
               flex-1
               overflow-hidden
-              rounded-[34px]
+              rounded-[28px]
               border
               border-white/10
               bg-white/[0.035]
               p-5
               backdrop-blur-3xl
-              sm:rounded-[44px]
+              sm:rounded-[36px]
               sm:p-8
+              lg:rounded-[44px]
               lg:p-14
             ">
-
               <div className="
                 absolute
                 right-[-180px]
@@ -287,12 +284,11 @@ export default function Page() {
                 relative
                 z-10
               ">
-
                 <p className="
                   text-[10px]
                   font-black
                   uppercase
-                  tracking-[0.25em]
+                  tracking-[0.22em]
                   text-cyan-300
                   sm:text-xs
                   sm:tracking-[0.35em]
@@ -302,9 +298,9 @@ export default function Page() {
 
                 <h1 className="
                   mt-5
-                  text-[clamp(2.4rem,8vw,7rem)]
+                  text-[clamp(2.3rem,11vw,7rem)]
                   font-black
-                  leading-[0.88]
+                  leading-[0.9]
                   tracking-[-0.08em]
                 ">
                   {t("home.title")}
@@ -313,9 +309,9 @@ export default function Page() {
                 <h2 className="
                   mt-7
                   max-w-[840px]
-                  text-[clamp(1.8rem,5vw,4.5rem)]
+                  text-[clamp(1.7rem,7vw,4.5rem)]
                   font-black
-                  leading-[0.95]
+                  leading-[0.98]
                   tracking-[-0.06em]
                   text-cyan-100
                 ">
@@ -325,8 +321,9 @@ export default function Page() {
                 <p className="
                   mt-4
                   max-w-[820px]
-                  text-base
+                  text-sm
                   font-semibold
+                  leading-7
                   text-white/75
                   sm:text-lg
                 ">
@@ -350,12 +347,10 @@ export default function Page() {
                   grid
                   grid-cols-1
                   gap-4
-                  lg:grid-cols-3
+                  md:grid-cols-3
                 ">
-
                   {current.points.map(
                     (point, index) => (
-
                       <div
                         key={point}
                         className="
@@ -369,7 +364,6 @@ export default function Page() {
                           sm:p-5
                         "
                       >
-
                         <p className="
                           text-sm
                           font-black
@@ -388,11 +382,9 @@ export default function Page() {
                         ">
                           {point}
                         </p>
-
                       </div>
                     )
                   )}
-
                 </div>
 
                 <div className="
@@ -402,13 +394,13 @@ export default function Page() {
                   gap-3
                   sm:flex-row
                 ">
-
                   <Link
                     href="/connect"
                     className="
                       nexus-primary
                       w-full
                       px-8
+                      text-center
                       sm:w-auto
                     "
                   >
@@ -421,22 +413,17 @@ export default function Page() {
                       nexus-secondary
                       w-full
                       px-8
+                      text-center
                       sm:w-auto
                     "
                   >
                     {t("home.cta.create")}
                   </Link>
-
                 </div>
-
               </div>
-
             </section>
-
           </div>
-
         </section>
-
       </main>
     </>
   )
