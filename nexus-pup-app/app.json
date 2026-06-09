@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Nexus PUP",
+    "slug": "nexus-pup",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "nexuspup",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "id.nexusnon.pup"
+    },
+    "android": {
+      "package": "id.nexusnon.pup",
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8c6caa75-8005-4bfb-b4d5-f268f7e699cf"
+      }
+    }
+  }
+}

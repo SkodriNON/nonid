@@ -190,7 +190,7 @@ export default function CardConnectWallet() {
         "Capsule found. Creating PUP approval request...",
 
       pup_request_sent:
-        "PUP request created. Open PUP and approve access.",
+        "PUP request created. OPEN NEXUSNON.ID and approve access.",
 
       pup_request_approved:
         "PUP approved. Opening Dashboard...",
@@ -931,7 +931,7 @@ export default function CardConnectWallet() {
                   tracking-[0.22em]
                   text-cyan-300
                 ">
-                  PUP Approval Required
+                  NEXUSNON.ID Approval Required
                 </div>
 
                 <p className="
@@ -940,7 +940,7 @@ export default function CardConnectWallet() {
                   leading-6
                   text-zinc-300
                 ">
-                  Open PUP in another tab and approve this login request.
+                  Open NEXUSNON.ID on your approved device and authorize this request.
                 </p>
 
                 {pupRequestId && (
@@ -979,7 +979,7 @@ export default function CardConnectWallet() {
                       text-cyan-200
                     "
                   >
-                    Open PUP
+                    OPEN NEXUSNON.ID
                   </button>
 
                   <button
