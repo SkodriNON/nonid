@@ -1,4 +1,5 @@
 import {
+  API,
   approvePupRequest,
   denyPupRequest,
   fetchPupRequests,
@@ -12,6 +13,7 @@ import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
 import {
   Alert,
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -22,58 +24,323 @@ import {
   View,
 } from "react-native";
 
-export default function HomeScreen() {
-  const [pairCode, setPairCode] = useState("");
-  const [pin, setPin] = useState("");
-  const [paired, setPaired] = useState(false);
-  const [pinCreated, setPinCreated] = useState(false);
-  const [biometricEnabled, setBiometricEnabled] = useState(false);
-  const [requests, setRequests] = useState<PupRequest[]>([]);
-  const [loadingRequests, setLoadingRequests] = useState(false);
-  const [actionLoading, setActionLoading] = useState("");
+const KEY_REGISTERED = "NEXUSNON_DEVICE_REGISTERED";
+const KEY_EMAIL = "NEXUSNON_DEVICE_EMAIL";
+const KEY_PHONE = "NEXUSNON_DEVICE_PHONE";
+const KEY_CAPSULE_ID = "NEXUSNON_DEVICE_CAPSULE_ID";
+const KEY_WALLET = "NEXUSNON_DEVICE_WALLET";
+const KEY_PIN = "NEXUSNON_DEVICE_PIN";
+const KEY_BIOMETRIC = "NEXUSNON_DEVICE_BIOMETRIC";
 
-  const [selectedRequestId, setSelectedRequestId] = useState("");
+export default function HomeScreen() {
+  const [registered, setRegistered] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
+
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [antiPhishing, setAntiPhishing] = useState("");
-  const [newPin, setNewPin] = useState("");
+  const [pin, setPin] = useState("");
   const [repeatPin, setRepeatPin] = useState("");
+  const [unlockPin, setUnlockPin] = useState("");
+
+  const [capsuleId, setCapsuleId] = useState("");
+  const [wallet, setWallet] = useState("");
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+
+  const [requests, setRequests] = useState<PupRequest[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState("");
+  const [selectedRequestId, setSelectedRequestId] = useState("");
+
+  const [activationAntiPhishing, setActivationAntiPhishing] = useState("");
+  const [activationPin, setActivationPin] = useState("");
+  const [activationRepeatPin, setActivationRepeatPin] = useState("");
 
   useEffect(() => {
-    loadLocalState();
-    loadPupRequests();
-
-    const timer = setInterval(loadPupRequests, 4000);
-
-    return () => clearInterval(timer);
+    boot();
   }, []);
 
-  async function loadLocalState() {
-    const savedPair = await SecureStore.getItemAsync("NEXUS_PUP_PAIR_CODE");
-    const savedPin = await SecureStore.getItemAsync("NEXUS_PUP_PIN");
-    const savedBio = await SecureStore.getItemAsync("NEXUS_PUP_BIOMETRIC");
+  useEffect(() => {
+    if (!registered || !unlocked) return;
 
-    if (savedPair) {
-      setPairCode(savedPair);
-      setPaired(true);
+    loadRequests();
+
+    const timer = setInterval(loadRequests, 4000);
+
+    return () => clearInterval(timer);
+  }, [registered, unlocked, capsuleId, wallet]);
+
+  async function boot() {
+    const savedRegistered = await SecureStore.getItemAsync(KEY_REGISTERED);
+    const savedEmail = await SecureStore.getItemAsync(KEY_EMAIL);
+    const savedPhone = await SecureStore.getItemAsync(KEY_PHONE);
+    const savedCapsuleId = await SecureStore.getItemAsync(KEY_CAPSULE_ID);
+    const savedWallet = await SecureStore.getItemAsync(KEY_WALLET);
+    const savedBio = await SecureStore.getItemAsync(KEY_BIOMETRIC);
+
+    if (
+      savedRegistered === "true" &&
+      savedCapsuleId &&
+      savedWallet
+    ) {
+      setRegistered(true);
+      setEmail(savedEmail || "");
+      setPhone(savedPhone || "");
+      setCapsuleId(savedCapsuleId);
+      setWallet(savedWallet);
+      setBiometricEnabled(savedBio === "true");
+
+      if (savedBio === "true") {
+        setTimeout(unlockWithBiometric, 450);
+      }
     }
-
-    if (savedPin) setPinCreated(true);
-    if (savedBio === "true") setBiometricEnabled(true);
   }
 
-  async function loadPupRequests() {
+  async function registerDevice() {
     try {
-      setLoadingRequests(true);
+      setLoading(true);
 
-      const list = await fetchPupRequests();
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanPhone = phone.trim();
+      const cleanAnti = antiPhishing.trim();
+      const cleanPin = pin.trim();
+      const cleanRepeat = repeatPin.trim();
 
-      setRequests(list.filter((request) => request.status === "pending"));
-    } catch {
+      if (!cleanEmail || !cleanPhone || !cleanAnti) {
+        Alert.alert(
+          "Missing Data",
+          "Email, phone and Anti-Phishing Code are required."
+        );
+        return;
+      }
+
+      if (cleanAnti.length < 4) {
+        Alert.alert(
+          "Invalid Anti-Phishing Code",
+          "Anti-Phishing Code must contain at least 4 characters."
+        );
+        return;
+      }
+
+      if (cleanPin.length !== 6 || cleanRepeat.length !== 6) {
+        Alert.alert(
+          "Invalid PIN",
+          "Create a 6-digit app PIN."
+        );
+        return;
+      }
+
+      if (cleanPin !== cleanRepeat) {
+        Alert.alert(
+          "PIN Mismatch",
+          "PIN codes do not match."
+        );
+        return;
+      }
+
+      const findResponse = await fetch(
+        `${API}/api/genesis/findCapsule`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: cleanEmail,
+            phone: cleanPhone,
+          }),
+        }
+      );
+
+      const findData = await findResponse.json();
+
+      if (
+        !findResponse.ok ||
+        findData.success !== true ||
+        findData.exists !== true ||
+        findData.matched !== true
+      ) {
+        Alert.alert(
+          "Capsule Not Found",
+          findData.message ||
+            findData.error ||
+            "No matching Capsule was found for this email and phone."
+        );
+        return;
+      }
+
+      const foundCapsuleId = String(findData.capsuleId || "");
+      const foundWallet = String(findData.capsuleWallet || "");
+
+      if (!foundCapsuleId || !foundWallet) {
+        Alert.alert(
+          "Invalid Capsule",
+          "Capsule data is missing."
+        );
+        return;
+      }
+
+      const verifyResponse = await fetch(
+        `${API}/api/genesis/verify-anti-phishing`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            capsuleId: foundCapsuleId,
+            wallet: foundWallet,
+            email: cleanEmail,
+            phone: cleanPhone,
+            antiPhishing: cleanAnti,
+          }),
+        }
+      );
+
+      const verifyData = await verifyResponse.json();
+
+      if (
+        !verifyResponse.ok ||
+        verifyData.success !== true
+      ) {
+        Alert.alert(
+          "Verification Failed",
+          verifyData.message ||
+            verifyData.error ||
+            "Anti-Phishing Code could not be verified."
+        );
+        return;
+      }
+
+      await SecureStore.setItemAsync(KEY_REGISTERED, "true");
+      await SecureStore.setItemAsync(KEY_EMAIL, cleanEmail);
+      await SecureStore.setItemAsync(KEY_PHONE, cleanPhone);
+      await SecureStore.setItemAsync(KEY_CAPSULE_ID, foundCapsuleId);
+      await SecureStore.setItemAsync(KEY_WALLET, foundWallet);
+      await SecureStore.setItemAsync(KEY_PIN, cleanPin);
+
+      setRegistered(true);
+      setUnlocked(true);
+      setCapsuleId(foundCapsuleId);
+      setWallet(foundWallet);
+      setPin("");
+      setRepeatPin("");
+      setAntiPhishing("");
+
       Alert.alert(
-        "PUP API Error",
-        "Could not load pending requests from NexusNON.ID."
+        "Device Registered",
+        "This phone is now registered as your NEXUSNON.ID approval device."
+      );
+    } catch (err: any) {
+      Alert.alert(
+        "Registration Failed",
+        err?.message || "Could not register this device."
       );
     } finally {
-      setLoadingRequests(false);
+      setLoading(false);
+    }
+  }
+
+  async function unlockWithPin() {
+    const savedPin = await SecureStore.getItemAsync(KEY_PIN);
+
+    if (!savedPin) {
+      Alert.alert(
+        "PIN Missing",
+        "Register this device again."
+      );
+      return;
+    }
+
+    if (unlockPin.trim() !== savedPin) {
+      Alert.alert(
+        "Wrong PIN",
+        "The PIN is incorrect."
+      );
+      return;
+    }
+
+    setUnlockPin("");
+    setUnlocked(true);
+  }
+
+  async function unlockWithBiometric() {
+    const savedBio = await SecureStore.getItemAsync(KEY_BIOMETRIC);
+
+    if (savedBio !== "true") return;
+
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: "Unlock NEXUSNON.ID",
+      fallbackLabel: "Use PIN",
+    });
+
+    if (result.success) {
+      setUnlocked(true);
+    }
+  }
+
+  async function enableBiometric() {
+    const compatible = await LocalAuthentication.hasHardwareAsync();
+
+    if (!compatible) {
+      Alert.alert(
+        "Not Supported",
+        "This device does not support biometrics."
+      );
+      return;
+    }
+
+    const enrolled = await LocalAuthentication.isEnrolledAsync();
+
+    if (!enrolled) {
+      Alert.alert(
+        "Not Enabled",
+        "Biometrics are not enabled on this device."
+      );
+      return;
+    }
+
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: "Enable NEXUSNON.ID biometric unlock",
+      fallbackLabel: "Use PIN",
+    });
+
+    if (result.success) {
+      await SecureStore.setItemAsync(KEY_BIOMETRIC, "true");
+      setBiometricEnabled(true);
+
+      Alert.alert(
+        "Enabled",
+        "Biometric unlock is now enabled."
+      );
+    }
+  }
+
+  async function loadRequests() {
+    try {
+      const list = await fetchPupRequests();
+
+      const mine = list.filter((request) => {
+        const sameCapsule =
+          String(request.capsuleId || "") === String(capsuleId);
+
+        const sameWallet =
+          String(request.wallet || "").toLowerCase() ===
+          String(wallet || "").toLowerCase();
+
+        return (
+          request.status === "pending" &&
+          sameCapsule &&
+          sameWallet
+        );
+      });
+
+      setRequests(mine);
+    } catch {
+      Alert.alert(
+        "Connection Error",
+        "Could not load approval requests."
+      );
     }
   }
 
@@ -86,101 +353,117 @@ export default function HomeScreen() {
     );
   }
 
-  async function requireLocalApproval() {
-    const savedPin = await SecureStore.getItemAsync("NEXUS_PUP_PIN");
-    const savedBio = await SecureStore.getItemAsync("NEXUS_PUP_BIOMETRIC");
+  function describeAction(action: string) {
+    const value =
+      String(action || "REQUEST");
 
-    if (!savedPin) {
-      Alert.alert("PIN Required", "Create your local PUP PIN first.");
-      return false;
+    if (value === "LOGIN_DASHBOARD") {
+      return "This request wants to open your Capsule dashboard.";
     }
 
-    if (savedBio === "true") {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Confirm Nexus PUP approval",
-        fallbackLabel: "Use PUP PIN",
-      });
-
-      if (!result.success) {
-        Alert.alert("Approval Cancelled", "Biometric confirmation failed.");
-        return false;
-      }
+    if (value === "ACTIVATE_PUP") {
+      return "This request wants to activate your PUP approval layer.";
     }
 
-    return true;
+    if (value.startsWith("BUSINESS_CAPSULE_APPROVAL")) {
+      return "This request wants to approve a Business Capsule action.";
+    }
+
+    return "This request needs approval from your NEXUSNON.ID device.";
   }
 
-  async function handleApprove(request: PupRequest) {
+  function formatAction(action: string) {
+    return String(action || "REQUEST").replace(/_/g, " ");
+  }
+
+  async function approve(request: PupRequest) {
     try {
       setActionLoading(request.id);
 
-      const activationMode = isActivationRequest(request);
+      const activation = isActivationRequest(request);
 
-      if (activationMode) {
-        if (!antiPhishing.trim() || antiPhishing.trim().length < 4) {
-          Alert.alert("Anti-Phishing Required", "Enter your Anti-Phishing Code.");
+      if (activation) {
+        if (
+          !activationAntiPhishing.trim() ||
+          activationAntiPhishing.trim().length < 4
+        ) {
+          Alert.alert(
+            "Anti-Phishing Required",
+            "Enter your Anti-Phishing Code."
+          );
           return;
         }
 
-        if (!newPin.trim() || newPin.trim().length < 6) {
-          Alert.alert("PIN Required", "Create a PUP PIN with at least 6 characters.");
+        if (
+          activationPin.trim().length !== 6 ||
+          activationRepeatPin.trim().length !== 6
+        ) {
+          Alert.alert(
+            "Invalid PIN",
+            "Create a 6-digit PUP PIN."
+          );
           return;
         }
 
-        if (newPin.trim() !== repeatPin.trim()) {
-          Alert.alert("PIN Mismatch", "PUP PINs do not match.");
+        if (activationPin.trim() !== activationRepeatPin.trim()) {
+          Alert.alert(
+            "PIN Mismatch",
+            "PUP PINs do not match."
+          );
           return;
         }
 
         const result = await mobileActivateAndApprove({
           requestId: request.id,
-          antiPhishing: antiPhishing.trim(),
-          newPin: newPin.trim(),
-          repeatPin: repeatPin.trim(),
+          antiPhishing: activationAntiPhishing.trim(),
+          newPin: activationPin.trim(),
+          repeatPin: activationRepeatPin.trim(),
         });
 
         if (result?.success) {
-          await SecureStore.setItemAsync("NEXUS_PUP_PIN", newPin.trim());
-          setPinCreated(true);
-          setAntiPhishing("");
-          setNewPin("");
-          setRepeatPin("");
+          await SecureStore.setItemAsync(KEY_PIN, activationPin.trim());
+
+          setActivationAntiPhishing("");
+          setActivationPin("");
+          setActivationRepeatPin("");
           setSelectedRequestId("");
 
           Alert.alert(
-            "PUP Activated",
-            "PUP was activated, 1 USDT fee was processed, and request was approved."
+            "Approved",
+            "PUP activated and request approved."
           );
 
-          await loadPupRequests();
+          await loadRequests();
         } else {
           Alert.alert(
             "Activation Failed",
-            result?.error || result?.message || "Could not activate PUP."
+            result?.error ||
+              result?.message ||
+              "Could not activate PUP."
           );
         }
 
         return;
       }
 
-      const allowed = await requireLocalApproval();
-
-      if (!allowed) return;
-
       const result = await approvePupRequest(request.id);
 
       if (result?.success) {
-        Alert.alert("Approved", "PUP request approved.");
-        await loadPupRequests();
+        Alert.alert(
+          "Approved",
+          "Request approved."
+        );
+
+        await loadRequests();
       } else {
         Alert.alert(
-          "Approve Failed",
+          "Approval Failed",
           result?.error || "Could not approve request."
         );
       }
     } catch (err: any) {
       Alert.alert(
-        "Approve Failed",
+        "Approval Failed",
         err?.message || "Could not approve request."
       );
     } finally {
@@ -188,100 +471,206 @@ export default function HomeScreen() {
     }
   }
 
-  async function handleDeny(request: PupRequest) {
+  async function deny(request: PupRequest) {
     try {
       setActionLoading(request.id);
 
       const result = await denyPupRequest(request.id);
 
       if (result?.success) {
-        Alert.alert("Denied", "PUP request denied.");
-        await loadPupRequests();
+        Alert.alert(
+          "Denied",
+          "Request denied."
+        );
+
+        await loadRequests();
       } else {
-        Alert.alert("Deny Failed", result?.error || "Could not deny request.");
+        Alert.alert(
+          "Deny Failed",
+          result?.error || "Could not deny request."
+        );
       }
     } catch {
-      Alert.alert("Deny Failed", "Could not deny request.");
+      Alert.alert(
+        "Deny Failed",
+        "Could not deny request."
+      );
     } finally {
       setActionLoading("");
     }
   }
 
-  async function handlePairDevice() {
-    if (pairCode.trim().length < 4) {
-      Alert.alert("Invalid Pair Code", "Enter the pair code from NexusNON.ID.");
-      return;
-    }
+  async function resetDevice() {
+    await SecureStore.deleteItemAsync(KEY_REGISTERED);
+    await SecureStore.deleteItemAsync(KEY_EMAIL);
+    await SecureStore.deleteItemAsync(KEY_PHONE);
+    await SecureStore.deleteItemAsync(KEY_CAPSULE_ID);
+    await SecureStore.deleteItemAsync(KEY_WALLET);
+    await SecureStore.deleteItemAsync(KEY_PIN);
+    await SecureStore.deleteItemAsync(KEY_BIOMETRIC);
 
-    await SecureStore.setItemAsync("NEXUS_PUP_PAIR_CODE", pairCode.trim());
-    setPaired(true);
+    setRegistered(false);
+    setUnlocked(false);
+    setEmail("");
+    setPhone("");
+    setCapsuleId("");
+    setWallet("");
+    setRequests([]);
+    setBiometricEnabled(false);
+  }
 
-    Alert.alert(
-      "Device Paired",
-      "This phone is now linked as a PUP approval device."
+  if (!registered) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" />
+
+        <LinearGradient
+          colors={["#020617", "#07111f", "#0b1020"]}
+          style={styles.bg}
+        >
+          <ScrollView contentContainerStyle={styles.container}>
+            <Image
+              source={require("@/assets/images/icon.png")}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+
+            <Text style={styles.kicker}>NEXUSNON.ID</Text>
+            <Text style={styles.title}>Register Device</Text>
+
+            <Text style={styles.subtitle}>
+              Register this phone as your secure NEXUSNON.ID approval device.
+            </Text>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Identity Verification</Text>
+
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                placeholderTextColor="#64748b"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                style={styles.input}
+              />
+
+              <TextInput
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="Phone with country code"
+                placeholderTextColor="#64748b"
+                keyboardType="phone-pad"
+                style={styles.input}
+              />
+
+              <TextInput
+                value={antiPhishing}
+                onChangeText={setAntiPhishing}
+                placeholder="Anti-Phishing Code"
+                placeholderTextColor="#64748b"
+                secureTextEntry
+                style={styles.input}
+              />
+
+              <TextInput
+                value={pin}
+                onChangeText={(value) =>
+                  setPin(value.replace(/[^0-9]/g, "").slice(0, 6))
+                }
+                placeholder="Create 6-digit PIN"
+                placeholderTextColor="#64748b"
+                keyboardType="number-pad"
+                secureTextEntry
+                style={styles.input}
+              />
+
+              <TextInput
+                value={repeatPin}
+                onChangeText={(value) =>
+                  setRepeatPin(value.replace(/[^0-9]/g, "").slice(0, 6))
+                }
+                placeholder="Repeat PIN"
+                placeholderTextColor="#64748b"
+                keyboardType="number-pad"
+                secureTextEntry
+                style={styles.input}
+              />
+
+              <Pressable
+                style={styles.button}
+                onPress={registerDevice}
+                disabled={loading}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? "Registering..." : "Register Device"}
+                </Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </LinearGradient>
+      </SafeAreaView>
     );
   }
 
-  async function handleCreatePin() {
-    if (pin.length !== 6) {
-      Alert.alert("Invalid PIN", "PUP PIN must be exactly 6 digits.");
-      return;
-    }
+  if (!unlocked) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" />
 
-    await SecureStore.setItemAsync("NEXUS_PUP_PIN", pin);
-    setPin("");
-    setPinCreated(true);
+        <LinearGradient
+          colors={["#020617", "#07111f", "#0b1020"]}
+          style={styles.bg}
+        >
+          <View style={styles.centerContainer}>
+            <Image
+              source={require("@/assets/images/icon.png")}
+              style={styles.logoImageSmall}
+              resizeMode="contain"
+            />
 
-    Alert.alert(
-      "PIN Created",
-      "Your local PUP PIN has been saved securely on this device."
+            <Text style={styles.kicker}>NEXUSNON.ID</Text>
+            <Text style={styles.titleSmall}>Unlock</Text>
+
+            <Text style={styles.subtitle}>
+              Enter your PIN to unlock this approval device.
+            </Text>
+
+            <TextInput
+              value={unlockPin}
+              onChangeText={(value) =>
+                setUnlockPin(value.replace(/[^0-9]/g, "").slice(0, 6))
+              }
+              placeholder="6-digit PIN"
+              placeholderTextColor="#64748b"
+              keyboardType="number-pad"
+              secureTextEntry
+              style={styles.input}
+            />
+
+            <Pressable
+              style={styles.button}
+              onPress={unlockWithPin}
+            >
+              <Text style={styles.buttonText}>
+                Unlock
+              </Text>
+            </Pressable>
+
+            {biometricEnabled && (
+              <Pressable
+                style={styles.buttonSecondary}
+                onPress={unlockWithBiometric}
+              >
+                <Text style={styles.buttonSecondaryText}>
+                  Use Biometrics
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        </LinearGradient>
+      </SafeAreaView>
     );
-  }
-
-  async function handleEnableBiometric() {
-    const compatible = await LocalAuthentication.hasHardwareAsync();
-
-    if (!compatible) {
-      Alert.alert(
-        "Not Supported",
-        "This device does not support Face ID or biometrics."
-      );
-      return;
-    }
-
-    const enrolled = await LocalAuthentication.isEnrolledAsync();
-
-    if (!enrolled) {
-      Alert.alert(
-        "Not Enabled",
-        "Face ID or biometrics are not enabled on this device."
-      );
-      return;
-    }
-
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: "Enable Nexus PUP biometric approval",
-      fallbackLabel: "Use PUP PIN",
-    });
-
-    if (result.success) {
-      await SecureStore.setItemAsync("NEXUS_PUP_BIOMETRIC", "true");
-      setBiometricEnabled(true);
-
-      Alert.alert(
-        "Face ID Enabled",
-        "Biometric approval is now enabled for Nexus PUP."
-      );
-    }
-  }
-
-  function formatWallet(wallet: string) {
-    if (!wallet) return "Unknown wallet";
-    return `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
-  }
-
-  function formatAction(action: string) {
-    return String(action || "PUP_REQUEST").replace(/_/g, " ");
   }
 
   return (
@@ -293,223 +682,164 @@ export default function HomeScreen() {
         style={styles.bg}
       >
         <ScrollView contentContainerStyle={styles.container}>
-          <View style={styles.logoCircle}>
-            <Text style={styles.logo}>NΩN</Text>
-          </View>
+          <Image
+            source={require("@/assets/images/icon.png")}
+            style={styles.logoImageSmall}
+            resizeMode="contain"
+          />
 
-          <Text style={styles.kicker}>NEXUS PUP</Text>
-          <Text style={styles.title}>Approval Device</Text>
+          <Text style={styles.kicker}>NEXUSNON.ID</Text>
+          <Text style={styles.titleSmall}>Approval Device</Text>
 
           <Text style={styles.subtitle}>
-            Pair this phone with your Capsule and approve sensitive actions securely.
+            {requests.length === 0
+              ? "Waiting for secure verification requests."
+              : "A secure request is waiting for your approval."}
           </Text>
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>1. Pair Capsule</Text>
-            <Text style={styles.cardText}>
-              Enter the PUP pairing code generated from your NexusNON.ID dashboard.
-            </Text>
-
-            <TextInput
-              value={pairCode}
-              onChangeText={setPairCode}
-              placeholder="Enter Pair Code"
-              placeholderTextColor="#64748b"
-              autoCapitalize="characters"
-              style={styles.input}
-            />
-
-            <Pressable style={styles.button} onPress={handlePairDevice}>
-              <Text style={styles.buttonText}>
-                {paired ? "Device Paired" : "Pair This Device"}
+          {requests.length === 0 ? (
+            <View style={styles.waitingCard}>
+              <Text style={styles.waitingIcon}>⌁</Text>
+              <Text style={styles.waitingTitle}>No pending requests</Text>
+              <Text style={styles.waitingText}>
+                Keep this app open when logging in to NEXUSNON.ID.
               </Text>
-            </Pressable>
 
-            {paired && (
-              <View style={styles.successBox}>
-                <Text style={styles.successTitle}>Capsule Linked</Text>
-                <Text style={styles.successText}>
-                  This phone is paired locally as your PUP approval device.
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>2. Create PUP PIN</Text>
-            <Text style={styles.cardText}>
-              This PIN stays only on this phone and protects approval actions.
-            </Text>
-
-            <TextInput
-              value={pin}
-              onChangeText={(value) =>
-                setPin(value.replace(/[^0-9]/g, "").slice(0, 6))
-              }
-              placeholder="6-digit PUP PIN"
-              placeholderTextColor="#64748b"
-              keyboardType="number-pad"
-              secureTextEntry
-              style={styles.input}
-            />
-
-            <Pressable style={styles.button} onPress={handleCreatePin}>
-              <Text style={styles.buttonText}>
-                {pinCreated ? "PIN Created" : "Create Local PIN"}
-              </Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>3. Face ID / Biometrics</Text>
-            <Text style={styles.cardText}>
-              Enable biometric confirmation before approving sensitive requests.
-            </Text>
-
-            <Pressable
-              style={styles.buttonSecondary}
-              onPress={handleEnableBiometric}
-            >
-              <Text style={styles.buttonSecondaryText}>
-                {biometricEnabled ? "Biometrics Enabled" : "Enable Face ID"}
-              </Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.requestCard}>
-            <View style={styles.requestHeader}>
-              <View>
-                <Text style={styles.cardTitle}>Pending Requests</Text>
-                <Text style={styles.requestSubtitle}>
-                  {loadingRequests
-                    ? "Loading from NexusNON.ID..."
-                    : `${requests.length} pending request(s)`}
-                </Text>
-              </View>
-
-              <Pressable style={styles.refreshButton} onPress={loadPupRequests}>
+              <Pressable
+                style={styles.refreshButton}
+                onPress={loadRequests}
+              >
                 <Text style={styles.refreshText}>Refresh</Text>
               </Pressable>
             </View>
+          ) : (
+            <View style={styles.requestList}>
+              {requests.map((request) => {
+                const activation = isActivationRequest(request);
+                const selected = selectedRequestId === request.id;
 
-            {requests.length === 0 ? (
-              <Text style={styles.empty}>No pending approvals yet.</Text>
-            ) : (
-              <View style={styles.requestList}>
-                {requests.map((request) => {
-                  const activationMode = isActivationRequest(request);
-                  const selected = selectedRequestId === request.id;
+                return (
+                  <View key={request.id} style={styles.requestCard}>
+                    <Text style={styles.requestLabel}>
+                      Verification request
+                    </Text>
 
-                  return (
-                    <View key={request.id} style={styles.pendingItem}>
-                      <Text style={styles.pendingAction}>
-                        {activationMode
-                          ? "First PUP Activation"
-                          : formatAction(request.action)}
-                      </Text>
+                    <Text style={styles.requestTitle}>
+                      {activation
+                        ? "Activate PUP"
+                        : formatAction(request.action)}
+                    </Text>
 
-                      <Text style={styles.pendingMeta}>
-                        Capsule #{request.capsuleId}
-                      </Text>
+                    <Text style={styles.requestDescription}>
+                      {describeAction(request.action)}
+                    </Text>
 
-                      <Text style={styles.pendingMeta}>
-                        {formatWallet(request.wallet)}
-                      </Text>
+                    {activation && selected && (
+                      <View style={styles.activationBox}>
+                        <TextInput
+                          value={activationAntiPhishing}
+                          onChangeText={setActivationAntiPhishing}
+                          placeholder="Anti-Phishing Code"
+                          placeholderTextColor="#64748b"
+                          secureTextEntry
+                          style={styles.input}
+                        />
 
-                      <View style={styles.statusBadge}>
-                        <Text style={styles.statusText}>
-                          {activationMode ? "ACTIVATION REQUIRED" : "PENDING"}
+                        <TextInput
+                          value={activationPin}
+                          onChangeText={(value) =>
+                            setActivationPin(
+                              value.replace(/[^0-9]/g, "").slice(0, 6)
+                            )
+                          }
+                          placeholder="Create PUP PIN"
+                          placeholderTextColor="#64748b"
+                          keyboardType="number-pad"
+                          secureTextEntry
+                          style={styles.input}
+                        />
+
+                        <TextInput
+                          value={activationRepeatPin}
+                          onChangeText={(value) =>
+                            setActivationRepeatPin(
+                              value.replace(/[^0-9]/g, "").slice(0, 6)
+                            )
+                          }
+                          placeholder="Repeat PUP PIN"
+                          placeholderTextColor="#64748b"
+                          keyboardType="number-pad"
+                          secureTextEntry
+                          style={styles.input}
+                        />
+                      </View>
+                    )}
+
+                    <View style={styles.actionRow}>
+                      <Pressable
+                        disabled={actionLoading === request.id}
+                        style={[
+                          styles.approveButton,
+                          actionLoading === request.id && styles.disabledButton,
+                        ]}
+                        onPress={() => {
+                          if (activation && !selected) {
+                            setSelectedRequestId(request.id);
+                            return;
+                          }
+
+                          approve(request);
+                        }}
+                      >
+                        <Text style={styles.approveText}>
+                          {actionLoading === request.id
+                            ? "Working..."
+                            : activation && !selected
+                              ? "Continue"
+                              : "Approve"}
                         </Text>
-                      </View>
+                      </Pressable>
 
-                      {activationMode && selected && (
-                        <View style={styles.activationBox}>
-                          <Text style={styles.activationTitle}>
-                            Activate PUP
-                          </Text>
-
-                          <Text style={styles.activationText}>
-                            This first activation requires your Anti-Phishing Code
-                            and charges 1 USDT from the Capsule Wallet.
-                          </Text>
-
-                          <TextInput
-                            value={antiPhishing}
-                            onChangeText={setAntiPhishing}
-                            placeholder="Anti-Phishing Code"
-                            placeholderTextColor="#64748b"
-                            secureTextEntry
-                            style={styles.input}
-                          />
-
-                          <TextInput
-                            value={newPin}
-                            onChangeText={setNewPin}
-                            placeholder="Create PUP PIN"
-                            placeholderTextColor="#64748b"
-                            secureTextEntry
-                            style={styles.input}
-                          />
-
-                          <TextInput
-                            value={repeatPin}
-                            onChangeText={setRepeatPin}
-                            placeholder="Repeat PUP PIN"
-                            placeholderTextColor="#64748b"
-                            secureTextEntry
-                            style={styles.input}
-                          />
-                        </View>
-                      )}
-
-                      <View style={styles.actionRow}>
-                        <Pressable
-                          disabled={actionLoading === request.id}
-                          style={[
-                            styles.approveButton,
-                            actionLoading === request.id && styles.disabledButton,
-                          ]}
-                          onPress={() => {
-                            if (activationMode && !selected) {
-                              setSelectedRequestId(request.id);
-                              return;
-                            }
-
-                            handleApprove(request);
-                          }}
-                        >
-                          <Text style={styles.approveText}>
-                            {actionLoading === request.id
-                              ? "Working..."
-                              : activationMode && !selected
-                                ? "Start Activation"
-                                : activationMode
-                                  ? "Activate & Approve"
-                                  : "Approve"}
-                          </Text>
-                        </Pressable>
-
-                        <Pressable
-                          disabled={actionLoading === request.id}
-                          style={[
-                            styles.denyButton,
-                            actionLoading === request.id && styles.disabledButton,
-                          ]}
-                          onPress={() => handleDeny(request)}
-                        >
-                          <Text style={styles.denyText}>Deny</Text>
-                        </Pressable>
-                      </View>
+                      <Pressable
+                        disabled={actionLoading === request.id}
+                        style={[
+                          styles.denyButton,
+                          actionLoading === request.id && styles.disabledButton,
+                        ]}
+                        onPress={() => deny(request)}
+                      >
+                        <Text style={styles.denyText}>
+                          Deny
+                        </Text>
+                      </Pressable>
                     </View>
-                  );
-                })}
-              </View>
-            )}
-          </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
 
-          <Text style={styles.footer}>
-            Capsule = Identity • Contract = Source of Truth • PUP = Approval Layer
-          </Text>
+          <View style={styles.settingsCard}>
+            <Pressable
+              style={styles.buttonSecondary}
+              onPress={enableBiometric}
+            >
+              <Text style={styles.buttonSecondaryText}>
+                {biometricEnabled
+                  ? "Biometrics Enabled"
+                  : "Enable Biometrics"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.logoutButton}
+              onPress={resetDevice}
+            >
+              <Text style={styles.logoutText}>
+                Remove Device
+              </Text>
+            </Pressable>
+          </View>
         </ScrollView>
       </LinearGradient>
     </SafeAreaView>
@@ -517,39 +847,53 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#020617" },
-  bg: { flex: 1 },
+  safe: {
+    flex: 1,
+    backgroundColor: "#020617",
+  },
+  bg: {
+    flex: 1,
+  },
   container: {
-    padding: 22,
-    paddingBottom: 50,
+    padding: 20,
+    paddingBottom: 36,
     alignItems: "center",
   },
-  logoCircle: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    borderWidth: 1,
-    borderColor: "rgba(34,211,238,0.35)",
+  centerContainer: {
+    flex: 1,
+    padding: 24,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 20,
-    backgroundColor: "rgba(15,23,42,0.8)",
   },
-  logo: {
-    color: "#fff",
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: 2,
+  logoImage: {
+    width: 118,
+    height: 118,
+    marginTop: 18,
+    marginBottom: 16,
+  },
+  logoImageSmall: {
+    width: 86,
+    height: 86,
+    marginTop: 14,
+    marginBottom: 14,
   },
   kicker: {
     color: "#22d3ee",
-    fontWeight: "800",
+    fontWeight: "900",
     letterSpacing: 4,
-    marginTop: 24,
+    fontSize: 12,
+    textAlign: "center",
   },
   title: {
     color: "#fff",
-    fontSize: 38,
+    fontSize: 32,
+    fontWeight: "900",
+    textAlign: "center",
+    marginTop: 8,
+  },
+  titleSmall: {
+    color: "#fff",
+    fontSize: 26,
     fontWeight: "900",
     textAlign: "center",
     marginTop: 8,
@@ -557,43 +901,39 @@ const styles = StyleSheet.create({
   subtitle: {
     color: "#94a3b8",
     textAlign: "center",
-    fontSize: 15,
-    lineHeight: 23,
-    marginTop: 12,
-    marginBottom: 24,
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 10,
+    marginBottom: 22,
   },
   card: {
     width: "100%",
-    borderRadius: 28,
-    padding: 20,
-    marginBottom: 14,
+    borderRadius: 26,
+    padding: 18,
     backgroundColor: "rgba(15,23,42,0.9)",
     borderWidth: 1,
     borderColor: "rgba(34,211,238,0.18)",
   },
   cardTitle: {
     color: "#fff",
-    fontSize: 21,
-    fontWeight: "800",
-    marginBottom: 8,
-  },
-  cardText: {
-    color: "#94a3b8",
-    lineHeight: 21,
-    marginBottom: 16,
+    fontSize: 19,
+    fontWeight: "900",
+    marginBottom: 14,
   },
   input: {
-    height: 54,
-    borderRadius: 16,
-    paddingHorizontal: 16,
+    height: 52,
+    width: "100%",
+    borderRadius: 15,
+    paddingHorizontal: 15,
     color: "#fff",
     backgroundColor: "rgba(2,6,23,0.9)",
     borderWidth: 1,
     borderColor: "rgba(148,163,184,0.22)",
-    marginBottom: 14,
+    marginBottom: 12,
   },
   button: {
-    height: 54,
+    height: 52,
+    width: "100%",
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
@@ -605,60 +945,51 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   buttonSecondary: {
-    height: 54,
+    height: 50,
+    width: "100%",
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(34,211,238,0.1)",
     borderWidth: 1,
     borderColor: "rgba(34,211,238,0.35)",
+    marginTop: 10,
   },
   buttonSecondaryText: {
     color: "#67e8f9",
     fontWeight: "900",
-    fontSize: 15,
+    fontSize: 14,
   },
-  successBox: {
-    marginTop: 16,
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: "rgba(34,197,94,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(34,197,94,0.35)",
-  },
-  successTitle: {
-    color: "#86efac",
-    fontWeight: "900",
-    marginBottom: 4,
-  },
-  successText: {
-    color: "#bbf7d0",
-    lineHeight: 20,
-  },
-  requestCard: {
+  waitingCard: {
     width: "100%",
-    marginTop: 0,
-    borderRadius: 26,
-    padding: 20,
-    backgroundColor: "rgba(15,23,42,0.65)",
+    borderRadius: 28,
+    padding: 24,
+    alignItems: "center",
+    backgroundColor: "rgba(15,23,42,0.78)",
     borderWidth: 1,
     borderColor: "rgba(148,163,184,0.12)",
   },
-  requestHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
+  waitingIcon: {
+    color: "#22d3ee",
+    fontSize: 42,
+    marginBottom: 8,
   },
-  requestSubtitle: {
-    color: "#64748b",
-    fontSize: 12,
-    marginTop: -2,
+  waitingTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  waitingText: {
+    color: "#94a3b8",
+    textAlign: "center",
+    marginTop: 8,
+    lineHeight: 21,
   },
   refreshButton: {
+    marginTop: 18,
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
     backgroundColor: "rgba(34,211,238,0.1)",
     borderWidth: 1,
     borderColor: "rgba(34,211,238,0.25)",
@@ -668,77 +999,55 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
   },
-  empty: {
-    color: "#64748b",
-    marginTop: 14,
-  },
   requestList: {
-    gap: 10,
-    marginTop: 14,
+    width: "100%",
+    gap: 12,
   },
-  pendingItem: {
-    borderRadius: 18,
-    padding: 14,
-    backgroundColor: "rgba(2,6,23,0.75)",
+  requestCard: {
+    width: "100%",
+    borderRadius: 28,
+    padding: 20,
+    backgroundColor: "rgba(15,23,42,0.92)",
     borderWidth: 1,
-    borderColor: "rgba(34,211,238,0.12)",
+    borderColor: "rgba(34,211,238,0.18)",
   },
-  pendingAction: {
-    color: "#fff",
-    fontSize: 15,
+  requestLabel: {
+    color: "#22d3ee",
+    fontSize: 11,
     fontWeight: "900",
-    marginBottom: 6,
+    letterSpacing: 2,
+    textTransform: "uppercase",
+  },
+  requestTitle: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "900",
+    marginTop: 10,
     textTransform: "capitalize",
   },
-  pendingMeta: {
+  requestDescription: {
     color: "#94a3b8",
-    fontSize: 12,
-    marginTop: 2,
-  },
-  statusBadge: {
-    alignSelf: "flex-start",
+    fontSize: 14,
+    lineHeight: 22,
     marginTop: 10,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: "rgba(250,204,21,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(250,204,21,0.25)",
-  },
-  statusText: {
-    color: "#fde68a",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1,
   },
   activationBox: {
-    marginTop: 14,
+    marginTop: 16,
     borderRadius: 18,
     padding: 14,
     backgroundColor: "rgba(250,204,21,0.08)",
     borderWidth: 1,
     borderColor: "rgba(250,204,21,0.25)",
   },
-  activationTitle: {
-    color: "#fde68a",
-    fontWeight: "900",
-    marginBottom: 6,
-  },
-  activationText: {
-    color: "#fef3c7",
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 12,
-  },
   actionRow: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 12,
+    marginTop: 18,
   },
   approveButton: {
     flex: 1,
-    height: 46,
-    borderRadius: 14,
+    height: 48,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#22d3ee",
@@ -746,12 +1055,11 @@ const styles = StyleSheet.create({
   approveText: {
     color: "#020617",
     fontWeight: "900",
-    fontSize: 12,
   },
   denyButton: {
     flex: 1,
-    height: 46,
-    borderRadius: 14,
+    height: 48,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(248,113,113,0.12)",
@@ -765,11 +1073,23 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.55,
   },
-  footer: {
-    color: "#64748b",
-    textAlign: "center",
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 24,
+  settingsCard: {
+    width: "100%",
+    marginTop: 18,
+  },
+  logoutButton: {
+    height: 48,
+    width: "100%",
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(248,113,113,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(248,113,113,0.3)",
+    marginTop: 10,
+  },
+  logoutText: {
+    color: "#fecaca",
+    fontWeight: "900",
   },
 });

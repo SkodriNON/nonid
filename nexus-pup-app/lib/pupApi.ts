@@ -1,5 +1,5 @@
 export const API =
-  "https://www.skodrinon.com"
+  "https://nonid.vercel.app"
 
 export type PupRequest =
   any

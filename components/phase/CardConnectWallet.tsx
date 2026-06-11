@@ -11,16 +11,18 @@ import {
 } from "next/navigation"
 
 import {
+  PhoneInput
+} from "react-international-phone"
+
+import "react-international-phone/style.css"
+
+import {
   LanguageSelector
 } from "@/components/LanguageSystem"
 
 import {
   createPupSession
 } from "@/lib/pupSession"
-
-import {
-  createViewSession
-} from "@/lib/viewSession"
 
 type FlowStatus =
   | "idle"
@@ -45,18 +47,36 @@ const ACTIVE_REQUEST_KEY =
 const APPROVED_KEY =
   "NEXUSNON_PUP_APPROVED"
 
+const emailProviders = [
+  "@gmail.com",
+  "@hotmail.com",
+  "@outlook.com",
+  "@icloud.com",
+  "@proton.me",
+  "@yahoo.com",
+  "@live.com",
+  "@aol.com",
+  "@mail.com"
+]
+
 export default function CardConnectWallet() {
   const router =
     useRouter()
 
   const watcherRef =
-    useRef<NodeJS.Timeout | null>(null)
+    useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const phoneRef =
+    useRef<HTMLInputElement | null>(null)
 
   const [email, setEmail] =
     useState("")
 
   const [phone, setPhone] =
     useState("")
+
+  const [showEmailProviders, setShowEmailProviders] =
+    useState(false)
 
   const [loading, setLoading] =
     useState(false)
@@ -132,6 +152,23 @@ export default function CardConnectWallet() {
     }
   }, [])
 
+  useEffect(() => {
+    function closeDropdowns() {
+      setShowEmailProviders(false)
+    }
+
+    window.addEventListener(
+      "click",
+      closeDropdowns
+    )
+
+    return () =>
+      window.removeEventListener(
+        "click",
+        closeDropdowns
+      )
+  }, [])
+
   function cleanEmail() {
     return email
       .trim()
@@ -187,19 +224,19 @@ export default function CardConnectWallet() {
         "No Capsule found. Opening Gateway...",
 
       capsule_found:
-        "Capsule found. Creating PUP approval request...",
+        "Capsule found. Creating NEXUSNON.ID approval request...",
 
       pup_request_sent:
-        "PUP request created. OPEN NEXUSNON.ID and approve access.",
+        "Request created. Approve it with your NEXUSNON.ID device.",
 
       pup_request_approved:
-        "PUP approved. Opening Dashboard...",
+        "Approved. Opening Dashboard...",
 
       pup_request_denied:
-        "PUP request denied.",
+        "Approval request denied.",
 
       pup_request_expired:
-        "PUP request expired. Please try again.",
+        "Approval request expired. Please try again.",
 
       capsule_locked:
         "Capsule is locked. Recovery approval is required.",
@@ -368,7 +405,8 @@ export default function CardConnectWallet() {
         foundCapsuleId,
         foundCapsuleWallet,
         emailValue,
-        phoneValue
+        phoneValue,
+        foundStatus
       )
 
     } catch (err: any) {
@@ -389,7 +427,8 @@ export default function CardConnectWallet() {
     targetCapsuleId: string,
     targetWallet: string,
     targetEmail: string,
-    targetPhone: string
+    targetPhone: string,
+    targetStatus: number | null
   ) {
     const existingRaw =
       localStorage.getItem(
@@ -459,6 +498,9 @@ export default function CardConnectWallet() {
       }
     }
 
+    const activationRequired =
+      targetStatus === 1
+
     const response =
       await fetch(
         "/api/pup/request/create",
@@ -482,7 +524,12 @@ export default function CardConnectWallet() {
               phone:
                 targetPhone,
               action:
-                "LOGIN_DASHBOARD"
+                activationRequired
+                  ? "ACTIVATE_PUP"
+                  : "LOGIN_DASHBOARD",
+              capsuleStatus:
+                targetStatus,
+              activationRequired
             })
         }
       )
@@ -550,7 +597,7 @@ export default function CardConnectWallet() {
       !capsuleWallet
     ) {
       setError(
-        "No active PUP request found. Try Connect again."
+        "No active approval request found. Try Connect again."
       )
       return
     }
@@ -632,7 +679,7 @@ export default function CardConnectWallet() {
       )
 
       setError(
-        "PUP denied this login request."
+        "NEXUSNON.ID denied this login request."
       )
 
       setFlowStep("form")
@@ -650,7 +697,7 @@ export default function CardConnectWallet() {
       )
 
       setError(
-        "PUP request expired. Please try again."
+        "Approval request expired. Please try again."
       )
 
       setFlowStep("form")
@@ -680,7 +727,7 @@ export default function CardConnectWallet() {
             )
           }
         },
-        1500
+        3000
       )
   }
 
@@ -688,7 +735,7 @@ export default function CardConnectWallet() {
     loading
       ? "Processing..."
       : flowStep === "waiting_pup"
-        ? "Waiting PUP Approval"
+        ? "Waiting Approval"
         : "Connect Capsule"
 
   return (
@@ -708,7 +755,7 @@ export default function CardConnectWallet() {
         min-h-[800px]
         w-full
         max-w-[520px]
-        overflow-hidden
+        overflow-visible
         rounded-[40px]
         border
         border-violet-500/20
@@ -725,6 +772,8 @@ export default function CardConnectWallet() {
           pointer-events-none
           absolute
           inset-0
+          overflow-hidden
+          rounded-[40px]
           bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.20),transparent_45%)]
         " />
 
@@ -828,7 +877,7 @@ export default function CardConnectWallet() {
             leading-8
             text-zinc-400
           ">
-            Connect your NexusNON identity. PUP approval is required before opening Dashboard.
+            Connect your NexusNON identity. NEXUSNON.ID approval is required before opening Dashboard.
           </p>
 
           <div className="
@@ -848,73 +897,170 @@ export default function CardConnectWallet() {
               NexusNON.ID
             </div>
 
-            <input
-              value={email}
-              onChange={(e) =>
-                setEmail(e.target.value)
+            <div
+              className="relative"
+              onClick={(e) =>
+                e.stopPropagation()
               }
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  connectCapsule()
-                }
-              }}
-              placeholder="Enter email"
-              autoComplete="email"
-              disabled={
-                flowStep !== "form"
-              }
-              className="
-                mt-4
-                h-14
-                w-full
-                rounded-2xl
-                border
-                border-white/10
-                bg-black/30
-                px-4
-                text-sm
-                font-semibold
-                text-white
-                outline-none
-                placeholder:text-zinc-600
-                focus:border-violet-400/50
-                disabled:opacity-70
-              "
-            />
+            >
+              <input
+                value={email}
+                onChange={(e) => {
+                  setEmail(
+                    e.target.value
+                  )
 
-            <input
-              value={phone}
-              onChange={(e) =>
-                setPhone(e.target.value)
-              }
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  connectCapsule()
+                  setShowEmailProviders(
+                    e.target.value.includes("@")
+                  )
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    phoneRef.current?.focus()
+                  }
+                }}
+                placeholder="Enter email"
+                autoComplete="email"
+                disabled={
+                  flowStep !== "form"
                 }
-              }}
-              placeholder="Enter phone number"
-              autoComplete="tel"
-              disabled={
-                flowStep !== "form"
-              }
-              className="
-                mt-4
-                h-14
-                w-full
-                rounded-2xl
-                border
-                border-white/10
-                bg-black/30
-                px-4
-                text-sm
-                font-semibold
-                text-white
-                outline-none
-                placeholder:text-zinc-600
-                focus:border-violet-400/50
-                disabled:opacity-70
-              "
-            />
+                className="
+                  mt-4
+                  h-14
+                  w-full
+                  rounded-2xl
+                  border
+                  border-white/10
+                  bg-black/30
+                  px-4
+                  text-sm
+                  font-semibold
+                  text-white
+                  outline-none
+                  placeholder:text-zinc-600
+                  focus:border-violet-400/50
+                  disabled:opacity-70
+                "
+              />
+
+              {showEmailProviders && flowStep === "form" && (
+                <div className="
+                  absolute
+                  left-0
+                  top-[72px]
+                  z-[999999]
+                  w-full
+                  overflow-hidden
+                  rounded-[20px]
+                  border
+                  border-white/10
+                  bg-[#0B1120]
+                  shadow-2xl
+                  backdrop-blur-xl
+                ">
+                  {emailProviders.map(
+                    (provider) => (
+                      <button
+                        key={provider}
+                        type="button"
+                        onClick={() => {
+                          const base =
+                            email.split("@")[0]
+
+                          setEmail(
+                            `${base}${provider}`
+                          )
+
+                          setShowEmailProviders(false)
+
+                          phoneRef.current?.focus()
+                        }}
+                        className="
+                          flex
+                          h-[54px]
+                          w-full
+                          items-center
+                          border-b
+                          border-white/5
+                          px-5
+                          text-left
+                          text-sm
+                          font-medium
+                          tracking-wide
+                          text-white
+                          transition
+                          hover:bg-white/[0.05]
+                        "
+                      >
+                        {provider}
+                      </button>
+                    )
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="
+              mt-4
+              overflow-visible
+              rounded-2xl
+              border
+              border-white/10
+              bg-black/30
+              px-2
+            ">
+              <PhoneInput
+                defaultCountry="se"
+                value={phone}
+                onChange={(value) =>
+                  setPhone(value)
+                }
+                disabled={
+                  flowStep !== "form"
+                }
+                forceDialCode
+                preferredCountries={[
+                  "se",
+                  "xk",
+                  "al",
+                  "de",
+                  "ch",
+                  "gb",
+                  "us"
+                ]}
+                countrySelectorStyleProps={{
+                  buttonClassName:
+                    flowStep !== "form"
+                      ? "!border-0 !bg-transparent !cursor-not-allowed"
+                      : "!border-0 !bg-transparent hover:!bg-white/5",
+
+                  dropdownStyleProps: {
+                    className:
+                      "!bg-[#0B1120] !border !border-white/10 !text-white !rounded-[24px] !shadow-2xl",
+
+                    listItemClassName:
+                      "!text-white hover:!bg-white/5",
+
+                    style: {
+                      maxHeight: "420px",
+                      overflowY: "auto",
+                      width: "340px"
+                    }
+                  }
+                }}
+                inputClassName="
+                  !h-14
+                  !w-full
+                  !border-0
+                  !bg-transparent
+                  !text-sm
+                  !font-semibold
+                  !text-white
+                  placeholder:!text-zinc-600
+                  focus:!ring-0
+                "
+              />
+            </div>
 
             {flowStep === "waiting_pup" && (
               <div className="

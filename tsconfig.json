@@ -2,13 +2,10 @@
   "compilerOptions": {
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
-
     "baseUrl": ".",
-
     "paths": {
       "@/*": ["./*"]
     },
-
     "allowJs": true,
     "skipLibCheck": true,
     "strict": false,
@@ -21,23 +18,32 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-
     "plugins": [
       {
         "name": "next"
       }
     ]
   },
-
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "types/**/*.ts",
+    "proxy.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".next",
+    "nexus-pup-app",
+    "artifacts",
+    "cache",
+    "contracts",
+    "relayer",
+    "scripts"
   ]
 }
