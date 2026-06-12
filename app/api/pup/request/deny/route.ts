@@ -23,6 +23,19 @@ export async function POST(
         ""
       ).trim()
 
+    const wallet =
+      String(body.wallet || "")
+        .trim()
+
+    const capsuleId =
+      String(body.capsuleId || "")
+        .trim()
+
+    const email =
+      String(body.email || "")
+        .trim()
+        .toLowerCase()
+
     if (!id) {
       return Response.json(
         {
@@ -36,15 +49,39 @@ export async function POST(
       )
     }
 
+    if (
+      !wallet &&
+      !capsuleId &&
+      !email
+    ) {
+      return Response.json(
+        {
+          success: false,
+          error:
+            "REQUEST_SCOPE_REQUIRED"
+        },
+        {
+          status: 400
+        }
+      )
+    }
+
     const request =
-      await denyPupRequest(id)
+      await denyPupRequest(
+        id,
+        {
+          wallet,
+          capsuleId,
+          email
+        }
+      )
 
     if (!request) {
       return Response.json(
         {
           success: false,
           error:
-            "REQUEST_NOT_FOUND"
+            "REQUEST_NOT_FOUND_OR_SCOPE_MISMATCH"
         },
         {
           status: 404

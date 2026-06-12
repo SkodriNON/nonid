@@ -886,7 +886,7 @@ export default function CardDashboard() {
                       }
                       className="h-[54px] rounded-[18px] bg-violet-300 font-black text-black"
                     >
-                      OPEN NEXUSNON.ID
+                      OPEN non.ID
                     </button>
 
                     <button

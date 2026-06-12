@@ -146,37 +146,114 @@ export default function PupPage() {
   const [newPassword, setNewPassword] =
     useState("")
 
+  const [emailOtp, setEmailOtp] =
+  useState("")
+
+const [otpSent, setOtpSent] =
+  useState(false)
+
+const [otpLoading, setOtpLoading] =
+  useState(false)
+
   const [repeatPassword, setRepeatPassword] =
     useState("")
 
-  async function loadRequests() {
-    try {
-      const res =
-        await fetch(
-          "/api/pup/request/list",
-          {
-            cache:
-              "no-store"
-          }
-        )
+ let pupLoadingLock = false
 
-      const data =
-        await res.json()
+async function loadRequests() {
+  if (pupLoadingLock) {
+    return
+  }
 
- if (data.success) {
-  setRequests(
-    data.requests || []
+  pupLoadingLock = true
+
+  try {
+    const activeRaw =
+      localStorage.getItem(
+        "NEXUSNON_ACTIVE_PUP_REQUEST"
+      )
+
+    if (!activeRaw) {
+  setMessage(
+    "No active PUP request found on this device."
+  )
+  return
+}
+
+    const active =
+      JSON.parse(activeRaw)
+
+    const wallet =
+      String(active.wallet || "")
+        .trim()
+
+    const capsuleId =
+      String(active.capsuleId || "")
+        .trim()
+
+    if (
+      !wallet &&
+      !capsuleId
+    ) {
+      setMessage(
+        "Active PUP request is missing wallet or Capsule ID."
+      )
+      return
+    }
+
+    const query =
+      new URLSearchParams()
+
+    if (wallet) {
+      query.set(
+        "wallet",
+        wallet
+      )
+    }
+
+    if (capsuleId) {
+      query.set(
+        "capsuleId",
+        capsuleId
+      )
+    }
+
+  const res =
+  await fetch(
+    `/api/pup/request/list?${query.toString()}`,
+    {
+      cache:
+        "no-store"
+    }
+  )
+
+const data =
+  await res.json()
+
+if (
+  !res.ok ||
+  !data.success
+) {
+  throw new Error(
+    data.error ||
+    "PUP_REQUEST_LIST_FAILED"
   )
 }
-        
-    } catch {
-      setMessage(
-        "Could not load PUP requests."
-      )
-    } finally {
-      setLoading(false)
-    }
+
+setRequests(
+  data.requests || []
+)
+
+  } catch (err: any) {
+    console.error(
+      "PUP_LOAD_REQUESTS_ERROR:",
+      err
+    )
+  } finally {
+    setLoading(false)
+    pupLoadingLock = false
   }
+}
 
   function isActivationRequest(
     request: PupRequest
@@ -203,6 +280,8 @@ export default function PupPage() {
     setAntiPhishing("")
     setNewPassword("")
     setRepeatPassword("")
+    setEmailOtp("")
+    setOtpSent(false)
   }
 
   async function approveRequestOnly(
@@ -219,10 +298,16 @@ export default function PupPage() {
               "application/json"
           },
           body:
-            JSON.stringify({
-              requestId:
-                request.id
-            })
+  JSON.stringify({
+    requestId:
+      request.id,
+    wallet:
+      request.wallet,
+    capsuleId:
+      request.capsuleId,
+    email:
+      request.email
+  })
         }
       )
 
@@ -262,6 +347,15 @@ export default function PupPage() {
   "NEXUSNON_ACTIVE_PUP_REQUEST"
 )
 
+setRequests((current) =>
+  current.filter(
+    (item) =>
+      item.id !== request.id
+  )
+)
+
+setMessage("")
+
     return data
   }
 
@@ -294,26 +388,123 @@ export default function PupPage() {
     )
   }
 
+  async function sendActivationEmailOtp(
+  request: PupRequest
+) {
+  try {
+    setOtpLoading(true)
+    setMessage("")
+
+    const response =
+      await fetch(
+        "/api/send-email-otp",
+        {
+          method:
+            "POST",
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+          body:
+            JSON.stringify({
+              email:
+                request.email,
+              phone:
+                request.phone
+            })
+        }
+      )
+
+    const data =
+      await response.json()
+
+    if (
+      !response.ok ||
+      data.success !== true
+    ) {
+      throw new Error(
+        data.message ||
+        data.error ||
+        "Email OTP send failed."
+      )
+    }
+
+    setOtpSent(true)
+    setMessage(
+      "Email OTP sent. The code is valid for 5 minutes."
+    )
+
+  } finally {
+    setOtpLoading(false)
+  }
+}
+
   async function setupLocalPupAndApprove(
   request: PupRequest
 ) {
+  
   if (
-    !antiPhishing.trim() ||
-    antiPhishing.trim().length < 4
-  ) {
-    throw new Error(
-      "Anti-Phishing Code is required before creating PUP password."
-    )
-  }
+  !antiPhishing.trim() ||
+  antiPhishing.trim().length < 4
+) {
+  throw new Error(
+    "Anti-Phishing Code is required before creating PUP password."
+  )
+}
 
-  if (
-    !newPassword.trim() ||
-    newPassword.trim().length < 6
-  ) {
-    throw new Error(
-      "Create a PUP password with at least 6 characters."
-    )
-  }
+if (
+  !emailOtp.trim() ||
+  emailOtp.trim().length !== 6
+) {
+  throw new Error(
+    "Email OTP is required before creating PUP password."
+  )
+}
+
+const otpResponse =
+  await fetch(
+    "/api/verify-otp",
+    {
+      method:
+        "POST",
+      headers: {
+        "Content-Type":
+          "application/json"
+      },
+      body:
+        JSON.stringify({
+          email:
+            request.email,
+          phone:
+            request.phone,
+          emailOtp:
+            emailOtp.trim()
+        })
+    }
+  )
+
+const otpData =
+  await otpResponse.json()
+
+if (
+  !otpResponse.ok ||
+  otpData.success !== true
+) {
+  throw new Error(
+    otpData.message ||
+    otpData.error ||
+    "Invalid Email OTP."
+  )
+}
+
+if (
+  !newPassword.trim() ||
+  newPassword.trim().length < 6
+) {
+  throw new Error(
+    "Create a PUP password with at least 6 characters."
+  )
+}
 
   if (
     newPassword.trim() !==
@@ -378,6 +569,51 @@ export default function PupPage() {
     ) {
       throw new Error(
         "Anti-Phishing Code is required for first PUP activation."
+      )
+    }
+
+    if (
+      !emailOtp.trim() ||
+      emailOtp.trim().length !== 6
+    ) {
+      throw new Error(
+        "Email OTP is required for first PUP activation."
+      )
+    }
+
+    const otpResponse =
+      await fetch(
+        "/api/verify-otp",
+        {
+          method:
+            "POST",
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+          body:
+            JSON.stringify({
+              email:
+                request.email,
+              phone:
+                request.phone,
+              emailOtp:
+                emailOtp.trim()
+            })
+        }
+      )
+
+    const otpData =
+      await otpResponse.json()
+
+    if (
+      !otpResponse.ok ||
+      otpData.success !== true
+    ) {
+      throw new Error(
+        otpData.message ||
+        otpData.error ||
+        "Invalid Email OTP."
       )
     }
 
@@ -585,17 +821,26 @@ export default function PupPage() {
   }
 
   useEffect(() => {
-    loadRequests()
+  loadRequests()
 
-    const timer =
-      setInterval(
-        loadRequests,
-        2000
-      )
+  const requestTimer =
+    setInterval(
+      loadRequests,
+      8000
+    )
 
-    return () =>
-      clearInterval(timer)
-  }, [])
+  const clockTimer =
+    setInterval(() => {
+      setRequests((current) => [
+        ...current
+      ])
+    }, 1000)
+
+  return () => {
+    clearInterval(requestTimer)
+    clearInterval(clockTimer)
+  }
+}, [])
 
   const pending =
     requests.filter(
@@ -695,23 +940,22 @@ export default function PupPage() {
               Refresh
             </button>
           </div>
-
-          {message && (
-            <div className="
-              mt-6
-              rounded-2xl
-              border
-              border-white/10
-              bg-white/[0.04]
-              px-4
-              py-3
-              text-sm
-              text-zinc-300
-            ">
-              {message}
-            </div>
-          )}
-
+<div
+  className="
+    mt-6
+    min-h-[52px]
+    rounded-2xl
+    border
+    border-white/10
+    bg-white/[0.04]
+    px-4
+    py-3
+    text-sm
+    text-zinc-300
+  "
+>
+  {message || "\u00A0"}
+</div>
           <div className="
             mt-8
             grid
@@ -935,6 +1179,67 @@ export default function PupPage() {
                                 placeholder="Anti-Phishing Code"
                                 className="
                                   mt-4
+                                  h-12
+                                  w-full
+                                  rounded-xl
+                                  border
+                                  border-white/10
+                                  bg-black/40
+                                  px-4
+                                  text-sm
+                                  text-white
+                                  outline-none
+                                  placeholder:text-zinc-600
+                                "
+                              />
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  sendActivationEmailOtp(
+                                    request
+                                  )
+                                }
+                                disabled={
+                                  otpLoading ||
+                                  otpSent
+                                }
+                                className="
+                                  mt-3
+                                  h-12
+                                  w-full
+                                  rounded-xl
+                                  border
+                                  border-amber-400/20
+                                  bg-amber-400/10
+                                  px-4
+                                  text-sm
+                                  font-black
+                                  text-amber-200
+                                  disabled:opacity-50
+                                "
+                              >
+                                {otpLoading
+                                  ? "Sending..."
+                                  : otpSent
+                                    ? "Email OTP Sent"
+                                    : "Send Email OTP"}
+                              </button>
+
+                              <input
+                                value={emailOtp}
+                                onChange={(e) =>
+                                  setEmailOtp(
+                                    e.target.value
+                                      .replace(/\D/g, "")
+                                      .slice(0, 6)
+                                  )
+                                }
+                                placeholder="Email OTP"
+                                inputMode="numeric"
+                                maxLength={6}
+                                className="
+                                  mt-3
                                   h-12
                                   w-full
                                   rounded-xl

@@ -27,6 +27,12 @@ export type PupRequest = {
   activationRequired?: boolean
 }
 
+export type PupRequestScope = {
+  wallet?: string
+  capsuleId?: string
+  email?: string
+}
+
 const TTL =
   1000 * 60 * 5
 
@@ -36,8 +42,14 @@ const TTL_SECONDS =
 const REQUEST_PREFIX =
   "nexusnon:pup:request:"
 
-const REQUEST_INDEX =
-  "nexusnon:pup:requests"
+const ACTIVE_WALLET_PREFIX =
+  "nexusnon:pup:active:wallet:"
+
+const ACTIVE_CAPSULE_PREFIX =
+  "nexusnon:pup:active:capsule:"
+
+const ACTIVE_EMAIL_PREFIX =
+  "nexusnon:pup:active:email:"
 
 const hasKv =
   Boolean(
@@ -58,31 +70,139 @@ const redis =
 const globalStore =
   globalThis as typeof globalThis & {
     __NEXUSNON_PUP_REQUESTS__?: Map<string, PupRequest>
+    __NEXUSNON_PUP_ACTIVE_WALLET__?: Map<string, string>
+    __NEXUSNON_PUP_ACTIVE_CAPSULE__?: Map<string, string>
+    __NEXUSNON_PUP_ACTIVE_EMAIL__?: Map<string, string>
   }
 
 const memoryRequests =
   globalStore.__NEXUSNON_PUP_REQUESTS__ ||
   new Map<string, PupRequest>()
 
+const activeWallet =
+  globalStore.__NEXUSNON_PUP_ACTIVE_WALLET__ ||
+  new Map<string, string>()
+
+const activeCapsule =
+  globalStore.__NEXUSNON_PUP_ACTIVE_CAPSULE__ ||
+  new Map<string, string>()
+
+const activeEmail =
+  globalStore.__NEXUSNON_PUP_ACTIVE_EMAIL__ ||
+  new Map<string, string>()
+
 globalStore.__NEXUSNON_PUP_REQUESTS__ =
   memoryRequests
+
+globalStore.__NEXUSNON_PUP_ACTIVE_WALLET__ =
+  activeWallet
+
+globalStore.__NEXUSNON_PUP_ACTIVE_CAPSULE__ =
+  activeCapsule
+
+globalStore.__NEXUSNON_PUP_ACTIVE_EMAIL__ =
+  activeEmail
 
 function now() {
   return Date.now()
 }
 
-function normalizeWallet(
-  wallet: string
-) {
+function normalizeWallet(wallet: string) {
   return String(wallet || "")
     .trim()
     .toLowerCase()
+}
+
+function normalizeCapsuleId(capsuleId: string) {
+  return String(capsuleId || "")
+    .trim()
+}
+
+function normalizeEmail(email: string) {
+  return String(email || "")
+    .trim()
+    .toLowerCase()
+}
+
+function normalizeScope(scope?: PupRequestScope) {
+  return {
+    wallet:
+      scope?.wallet
+        ? normalizeWallet(scope.wallet)
+        : "",
+    capsuleId:
+      scope?.capsuleId
+        ? normalizeCapsuleId(scope.capsuleId)
+        : "",
+    email:
+      scope?.email
+        ? normalizeEmail(scope.email)
+        : ""
+  }
+}
+
+function hasScope(scope?: PupRequestScope) {
+  const normalized =
+    normalizeScope(scope)
+
+  return Boolean(
+    normalized.wallet ||
+    normalized.capsuleId ||
+    normalized.email
+  )
+}
+
+function matchesScope(
+  request: PupRequest,
+  scope?: PupRequestScope
+) {
+  const normalized =
+    normalizeScope(scope)
+
+  if (
+    normalized.wallet &&
+    request.wallet !== normalized.wallet
+  ) {
+    return false
+  }
+
+  if (
+    normalized.capsuleId &&
+    request.capsuleId !== normalized.capsuleId
+  ) {
+    return false
+  }
+
+  if (
+    normalized.email &&
+    request.email !== normalized.email
+  ) {
+    return false
+  }
+
+  return true
 }
 
 function createId() {
   return crypto
     .randomBytes(24)
     .toString("hex")
+}
+
+function requestKey(id: string) {
+  return `${REQUEST_PREFIX}${id}`
+}
+
+function activeWalletKey(wallet: string) {
+  return `${ACTIVE_WALLET_PREFIX}${wallet}`
+}
+
+function activeCapsuleKey(capsuleId: string) {
+  return `${ACTIVE_CAPSULE_PREFIX}${capsuleId}`
+}
+
+function activeEmailKey(email: string) {
+  return `${ACTIVE_EMAIL_PREFIX}${email}`
 }
 
 export function normalizePupRequest(
@@ -93,10 +213,19 @@ export function normalizePupRequest(
 
   const normalized: PupRequest = {
     ...request,
+    capsuleId:
+      normalizeCapsuleId(request.capsuleId),
     wallet:
-      normalizeWallet(
-        request.wallet
-      )
+      normalizeWallet(request.wallet),
+    email:
+      normalizeEmail(request.email),
+    phone:
+      String(request.phone || "").trim(),
+    action:
+      String(
+        request.action ||
+        "LOGIN_DASHBOARD"
+      ).trim()
   }
 
   if (
@@ -113,17 +242,77 @@ export function normalizePupRequest(
   return normalized
 }
 
+async function saveActivePointers(
+  request: PupRequest
+) {
+  if (redis) {
+    if (request.wallet) {
+      await redis.set(
+        activeWalletKey(request.wallet),
+        request.id,
+        {
+          ex:
+            TTL_SECONDS
+        }
+      )
+    }
+
+    if (request.capsuleId) {
+      await redis.set(
+        activeCapsuleKey(request.capsuleId),
+        request.id,
+        {
+          ex:
+            TTL_SECONDS
+        }
+      )
+    }
+
+    if (request.email) {
+      await redis.set(
+        activeEmailKey(request.email),
+        request.id,
+        {
+          ex:
+            TTL_SECONDS
+        }
+      )
+    }
+
+    return
+  }
+
+  if (request.wallet) {
+    activeWallet.set(
+      request.wallet,
+      request.id
+    )
+  }
+
+  if (request.capsuleId) {
+    activeCapsule.set(
+      request.capsuleId,
+      request.id
+    )
+  }
+
+  if (request.email) {
+    activeEmail.set(
+      request.email,
+      request.id
+    )
+  }
+}
+
 async function saveRequest(
   request: PupRequest
 ) {
   const normalized =
-    normalizePupRequest(
-      request
-    )
+    normalizePupRequest(request)
 
   if (redis) {
     await redis.set(
-      `${REQUEST_PREFIX}${normalized.id}`,
+      requestKey(normalized.id),
       normalized,
       {
         ex:
@@ -131,14 +320,8 @@ async function saveRequest(
       }
     )
 
-    await redis.zadd(
-      REQUEST_INDEX,
-      {
-        score:
-          normalized.createdAt,
-        member:
-          normalized.id
-      }
+    await saveActivePointers(
+      normalized
     )
 
     return normalized
@@ -146,6 +329,10 @@ async function saveRequest(
 
   memoryRequests.set(
     normalized.id,
+    normalized
+  )
+
+  await saveActivePointers(
     normalized
   )
 
@@ -172,25 +359,18 @@ export async function createPupRequest(
   const request: PupRequest = {
     id,
     capsuleId:
-      String(
-        input.capsuleId
-      ),
+      normalizeCapsuleId(input.capsuleId),
     wallet:
-      normalizeWallet(
-        input.wallet
-      ),
+      normalizeWallet(input.wallet),
     email:
-      String(input.email || "")
-        .trim()
-        .toLowerCase(),
+      normalizeEmail(input.email),
     phone:
-      String(input.phone || "")
-        .trim(),
+      String(input.phone || "").trim(),
     action:
       String(
         input.action ||
         "LOGIN_DASHBOARD"
-      ),
+      ).trim(),
     status:
       "pending",
     createdAt,
@@ -204,27 +384,21 @@ export async function createPupRequest(
       input.activationRequired
   }
 
-  return await saveRequest(
-    request
-  )
+  return await saveRequest(request)
 }
 
-export async function getPupRequest(
-  id: string
-) {
+export async function getPupRequest(id: string) {
   if (redis) {
     const request =
       await redis.get<PupRequest>(
-        `${REQUEST_PREFIX}${id}`
+        requestKey(id)
       )
 
     if (!request) {
       return null
     }
 
-    return normalizePupRequest(
-      request
-    )
+    return normalizePupRequest(request)
   }
 
   const request =
@@ -234,65 +408,141 @@ export async function getPupRequest(
     return null
   }
 
-  return normalizePupRequest(
-    request
-  )
+  return normalizePupRequest(request)
 }
 
-export async function listPupRequests() {
+async function getActiveRequestId(
+  scope: PupRequestScope
+) {
+  const normalized =
+    normalizeScope(scope)
+
   if (redis) {
-    const ids =
-      await redis.zrange<string[]>(
-        REQUEST_INDEX,
-        0,
-        -1
-      )
-
-    const requests: PupRequest[] =
-      []
-
-    for (const id of ids) {
-      const request =
-        await getPupRequest(
-          id
+    if (normalized.wallet) {
+      const id =
+        await redis.get<string>(
+          activeWalletKey(normalized.wallet)
         )
 
-      if (request) {
-        requests.push(
-          request
-        )
+      if (id) {
+        return id
       }
     }
 
-    return requests
-      .map(
-        normalizePupRequest
-      )
-      .sort(
-        (a, b) =>
-          b.createdAt - a.createdAt
-      )
+    if (normalized.capsuleId) {
+      const id =
+        await redis.get<string>(
+          activeCapsuleKey(normalized.capsuleId)
+        )
+
+      if (id) {
+        return id
+      }
+    }
+
+    if (normalized.email) {
+      const id =
+        await redis.get<string>(
+          activeEmailKey(normalized.email)
+        )
+
+      if (id) {
+        return id
+      }
+    }
+
+    return null
   }
 
-  return Array
-    .from(
-      memoryRequests.values()
+  if (normalized.wallet) {
+    const id =
+      activeWallet.get(normalized.wallet)
+
+    if (id) {
+      return id
+    }
+  }
+
+  if (normalized.capsuleId) {
+    const id =
+      activeCapsule.get(normalized.capsuleId)
+
+    if (id) {
+      return id
+    }
+  }
+
+  if (normalized.email) {
+    const id =
+      activeEmail.get(normalized.email)
+
+    if (id) {
+      return id
+    }
+  }
+
+  return null
+}
+
+export async function getScopedPupRequest(
+  id: string,
+  scope: PupRequestScope
+) {
+  if (!hasScope(scope)) {
+    return null
+  }
+
+  const request =
+    await getPupRequest(id)
+
+  if (!request) {
+    return null
+  }
+
+  if (!matchesScope(request, scope)) {
+    return null
+  }
+
+  return request
+}
+
+export async function listPupRequests(
+  filter?: PupRequestScope
+) {
+  if (!hasScope(filter)) {
+    return []
+  }
+
+  const activeId =
+    await getActiveRequestId(
+      filter || {}
     )
-    .map(
-      normalizePupRequest
+
+  if (!activeId) {
+    return []
+  }
+
+  const request =
+    await getScopedPupRequest(
+      activeId,
+      filter || {}
     )
-    .sort(
-      (a, b) =>
-        b.createdAt - a.createdAt
-    )
+
+  if (!request) {
+    return []
+  }
+
+  return [request]
 }
 
 export async function approvePupRequest(
-  id: string
+  id: string,
+  scope: PupRequestScope
 ) {
   const request =
-    await getPupRequest(
-      id
+    await getScopedPupRequest(
+      id,
+      scope
     )
 
   if (!request) {
@@ -318,18 +568,17 @@ export async function approvePupRequest(
       current
   }
 
-  return await saveRequest(
-    updated
-  )
+  return await saveRequest(updated)
 }
 
 export async function denyPupRequest(
-  id: string
+  id: string,
+  scope?: PupRequestScope
 ) {
   const request =
-    await getPupRequest(
-      id
-    )
+    scope && hasScope(scope)
+      ? await getScopedPupRequest(id, scope)
+      : await getPupRequest(id)
 
   if (!request) {
     return null
@@ -354,7 +603,5 @@ export async function denyPupRequest(
       current
   }
 
-  return await saveRequest(
-    updated
-  )
+  return await saveRequest(updated)
 }

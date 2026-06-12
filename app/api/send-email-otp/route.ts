@@ -107,23 +107,42 @@ export async function POST(
         : email
 
     const existing =
-      otpStore.get(key)
+  otpStore.get(key)
 
-    const emailOtp =
-      generateOtp()
+if (
+  existing?.emailOtp &&
+  existing?.expires &&
+  existing.expires > Date.now()
+) {
+  return Response.json(
+    {
+      success: false,
+      error:
+        "OTP_ALREADY_SENT",
+      message:
+        "OTP was already sent. Please wait 5 minutes before requesting a new code."
+    },
+    {
+      status: 429
+    }
+  )
+}
 
-    otpStore.set(
-      key,
-      {
-        phoneOtp:
-          existing?.phoneOtp || "",
-        emailOtp,
-        expires:
-          Date.now() +
-          5 * 60 * 1000,
-        email
-      }
-    )
+const emailOtp =
+  generateOtp()
+
+otpStore.set(
+  key,
+  {
+    phoneOtp:
+      existing?.phoneOtp || "",
+    emailOtp,
+    expires:
+      Date.now() +
+      5 * 60 * 1000,
+    email
+  }
+)
 
     const from =
       process.env.RESEND_FROM_EMAIL ||

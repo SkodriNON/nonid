@@ -179,7 +179,14 @@ export async function POST(
     }
 
     const approvedRequest =
-      await approvePupRequest(requestId)
+  await approvePupRequest(
+    requestId,
+    {
+      wallet,
+      capsuleId,
+      email: request.email
+    }
+  )
 
     if (!approvedRequest) {
       return Response.json(

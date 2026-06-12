@@ -78,6 +78,18 @@ export default function CardConnectWallet() {
   const [showEmailProviders, setShowEmailProviders] =
     useState(false)
 
+  const [showNonIdLogin, setShowNonIdLogin] =
+  useState(false)
+
+  const [showNonIdQr, setShowNonIdQr] =
+  useState(false)
+
+  const [nonIdQrSessionId, setNonIdQrSessionId] =
+  useState("")
+
+const [nonIdQrLoading, setNonIdQrLoading] =
+  useState(false)
+
   const [loading, setLoading] =
     useState(false)
 
@@ -98,6 +110,20 @@ export default function CardConnectWallet() {
 
   const [error, setError] =
     useState("")
+
+  const [fundingWallet, setFundingWallet] =
+    useState("")
+
+  const [copiedWallet, setCopiedWallet] =
+    useState(false)
+
+  const fundingNetwork =
+    "Arbitrum"
+
+  const fundingShareText =
+    fundingWallet
+      ? `Deposit minimum 1 USDT on ${fundingNetwork} to this NexusNON.ID Capsule Wallet:\n\n${fundingWallet}`
+      : ""
 
   useEffect(() => {
     function onStorage(
@@ -191,6 +217,49 @@ export default function CardConnectWallet() {
     return `${address.slice(0, 6)}...${address.slice(-4)}`
   }
 
+  async function copyFundingWallet() {
+    if (!fundingWallet) {
+      return
+    }
+
+    await navigator.clipboard.writeText(
+      fundingWallet
+    )
+
+    setCopiedWallet(true)
+
+    setTimeout(() => {
+      setCopiedWallet(false)
+    }, 1800)
+  }
+
+  async function shareFundingWallet() {
+    if (!fundingWallet) {
+      return
+    }
+
+    if (navigator.share) {
+      await navigator.share({
+        title:
+          "NexusNON.ID Capsule Wallet",
+        text:
+          fundingShareText
+      })
+
+      return
+    }
+
+    await navigator.clipboard.writeText(
+      fundingShareText
+    )
+
+    setCopiedWallet(true)
+
+    setTimeout(() => {
+      setCopiedWallet(false)
+    }, 1800)
+  }
+
   function stopWatcher() {
     if (watcherRef.current) {
       clearInterval(
@@ -227,7 +296,7 @@ export default function CardConnectWallet() {
         "Capsule found. Creating NEXUSNON.ID approval request...",
 
       pup_request_sent:
-        "Request created. Approve it with your NEXUSNON.ID device.",
+        "Request created. Open non.ID and approve the login.",
 
       pup_request_approved:
         "Approved. Opening Dashboard...",
@@ -271,12 +340,74 @@ export default function CardConnectWallet() {
     }
   }
 
+async function openNonIdQrLogin() {
+  try {
+    setNonIdQrLoading(true)
+
+    const response =
+      await fetch(
+        "/api/pup/qr/create",
+        {
+          method: "POST",
+          cache: "no-store"
+        }
+      )
+
+    const data =
+      await readJsonSafe(response)
+
+    if (
+      !response.ok ||
+      data.success !== true
+    ) {
+      throw new Error(
+        data.error ||
+        "QR_CREATE_FAILED"
+      )
+    }
+
+    const sessionId =
+      String(
+        data?.session?.id ||
+        data?.qr?.sessionId ||
+        ""
+      )
+
+    if (!sessionId) {
+      throw new Error(
+        "QR_SESSION_MISSING"
+      )
+    }
+
+    setNonIdQrSessionId(
+      sessionId
+    )
+
+    setShowNonIdLogin(false)
+setShowNonIdQr(true)
+
+startNonIdQrWatcher(
+  sessionId
+)
+
+  } catch (err: any) {
+    alert(
+      err?.message ||
+      "Could not create QR login."
+    )
+  } finally {
+    setNonIdQrLoading(false)
+  }
+}
+
   async function connectCapsule() {
     try {
       stopWatcher()
 
       setLoading(true)
       setError("")
+      setFundingWallet("")
+      setCopiedWallet(false)
       setCapsuleId("")
       setCapsuleWallet("")
       setPupRequestId("")
@@ -401,13 +532,86 @@ export default function CardConnectWallet() {
 
       setStatus("capsule_found")
 
-      await createPupLoginRequest(
-        foundCapsuleId,
-        foundCapsuleWallet,
-        emailValue,
-        phoneValue,
-        foundStatus
+const holdingsResponse =
+  await fetch(
+    `/api/wallet/holdings?address=${encodeURIComponent(
+  foundCapsuleWallet
+)}`,
+    {
+      method:
+        "GET",
+      cache:
+        "no-store"
+    }
+  )
+
+const holdingsData =
+  await readJsonSafe(
+    holdingsResponse
+  )
+
+const tokens =
+  Array.isArray(
+    holdingsData?.tokens
+  )
+    ? holdingsData.tokens
+    : Array.isArray(
+        holdingsData?.assets?.tokens
       )
+      ? holdingsData.assets.tokens
+      : []
+
+const usdtToken =
+  tokens.find((token: any) => {
+    const symbol =
+      String(
+        token?.symbol ||
+        token?.ticker ||
+        token?.name ||
+        ""
+      ).toLowerCase()
+
+    return (
+      symbol === "usdt" ||
+      symbol === "musdt" ||
+      symbol.includes("usdt")
+    )
+  })
+
+const usdtBalance =
+  Number(
+    usdtToken?.balance ||
+    usdtToken?.formatted ||
+    usdtToken?.amount ||
+    0
+  )
+
+if (
+  !holdingsResponse.ok ||
+  !holdingsData?.success ||
+  !usdtToken ||
+  usdtBalance < 1
+) {
+  setFundingWallet(
+    foundCapsuleWallet
+  )
+
+  setStatus("failed")
+
+  setError(
+    "Activation and access require minimum 1 USDT in your Capsule Wallet."
+  )
+
+  return
+}
+
+await createPupLoginRequest(
+  foundCapsuleId,
+  foundCapsuleWallet,
+  emailValue,
+  phoneValue,
+  foundStatus
+)
 
     } catch (err: any) {
       console.error(err)
@@ -448,17 +652,21 @@ export default function CardConnectWallet() {
             String(targetWallet || "").toLowerCase()
         ) {
           const statusResponse =
-            await fetch(
-              `/api/pup/request/status?id=${encodeURIComponent(
-                existing.requestId
-              )}`,
-              {
-                method:
-                  "GET",
-                cache:
-                  "no-store"
-              }
-            )
+  await fetch(
+    `/api/pup/request/status?id=${encodeURIComponent(
+      existing.requestId
+    )}&wallet=${encodeURIComponent(
+      targetWallet
+    )}&capsuleId=${encodeURIComponent(
+      targetCapsuleId
+    )}&email=${encodeURIComponent(
+      targetEmail
+    )}`,
+    {
+      method: "GET",
+      cache: "no-store"
+    }
+  )
 
           const statusData =
             await readJsonSafe(
@@ -615,10 +823,14 @@ export default function CardConnectWallet() {
     targetWallet: string
   ) {
     const response =
-      await fetch(
-        `/api/pup/request/status?id=${encodeURIComponent(
-          requestId
-        )}`,
+  await fetch(
+    `/api/pup/request/status?id=${encodeURIComponent(
+      requestId
+    )}&wallet=${encodeURIComponent(
+      targetWallet
+    )}&capsuleId=${encodeURIComponent(
+      targetCapsuleId
+    )}`,
         {
           method:
             "GET",
@@ -737,6 +949,118 @@ export default function CardConnectWallet() {
       : flowStep === "waiting_pup"
         ? "Waiting Approval"
         : "Connect Capsule"
+
+    
+        function startNonIdQrWatcher(
+  sessionId: string
+) {
+  stopWatcher()
+
+  watcherRef.current =
+    setInterval(
+      async () => {
+        try {
+          const response =
+            await fetch(
+              `/api/pup/qr/status?id=${encodeURIComponent(
+                sessionId
+              )}`,
+              {
+                method: "GET",
+                cache: "no-store"
+              }
+            )
+
+          const data =
+            await readJsonSafe(
+              response
+            )
+
+          if (
+            !response.ok ||
+            data.success !== true
+          ) {
+            return
+          }
+
+          const session =
+            data.session
+
+          if (
+            session?.status === "approved"
+          ) {
+            stopWatcher()
+
+            const capsuleId =
+              String(
+                session.capsuleId || ""
+              )
+
+            const wallet =
+              String(
+                session.wallet || ""
+              )
+
+            if (
+              !capsuleId ||
+              !wallet
+            ) {
+              alert(
+                "Approved but session data missing."
+              )
+              return
+            }
+
+            createPupSession(
+              capsuleId,
+              wallet
+            )
+
+            window.location.href =
+              `/dashboard?capsuleId=${encodeURIComponent(
+                capsuleId
+              )}&wallet=${encodeURIComponent(
+                wallet
+              )}`
+
+            return
+          }
+
+          if (
+            session?.status === "denied"
+          ) {
+            stopWatcher()
+
+            alert(
+              "Login denied."
+            )
+
+            setShowNonIdQr(false)
+
+            return
+          }
+
+          if (
+            session?.status === "expired"
+          ) {
+            stopWatcher()
+
+            alert(
+              "QR login expired."
+            )
+
+            setShowNonIdQr(false)
+          }
+        } catch (err) {
+          console.error(
+            "NONID_QR_WATCH_ERROR",
+            err
+          )
+        }
+      },
+      2500
+    )
+}
 
   return (
     <main className="
@@ -903,6 +1227,29 @@ export default function CardConnectWallet() {
                 e.stopPropagation()
               }
             >
+
+<button
+  type="button"
+  onClick={() => setShowNonIdLogin(true)}
+  className="
+    mt-4
+    mb-4
+    h-14
+    w-full
+    rounded-2xl
+    border
+    border-cyan-400/20
+    bg-cyan-400/10
+    text-base
+    font-black
+    text-cyan-200
+    transition
+    hover:bg-cyan-400/15
+  "
+>
+  Login with non.ID
+</button>
+            
               <input
                 value={email}
                 onChange={(e) => {
@@ -1077,7 +1424,7 @@ export default function CardConnectWallet() {
                   tracking-[0.22em]
                   text-cyan-300
                 ">
-                  NEXUSNON.ID Approval Required
+                  non.ID Approval Required
                 </div>
 
                 <p className="
@@ -1086,7 +1433,7 @@ export default function CardConnectWallet() {
                   leading-6
                   text-zinc-300
                 ">
-                  Open NEXUSNON.ID on your approved device and authorize this request.
+                  OPEN non.ID on your approved device and authorize this request.
                 </p>
 
                 {pupRequestId && (
@@ -1125,7 +1472,7 @@ export default function CardConnectWallet() {
                       text-cyan-200
                     "
                   >
-                    OPEN NEXUSNON.ID
+                    OPEN non.ID
                   </button>
 
                   <button
@@ -1156,6 +1503,187 @@ export default function CardConnectWallet() {
             ">
               {statusText()}
             </p>
+
+            {fundingWallet && (
+              <div className="
+                mt-5
+                rounded-3xl
+                border
+                border-amber-400/20
+                bg-amber-400/10
+                p-4
+              ">
+                <div className="
+                  flex
+                  items-start
+                  justify-between
+                  gap-4
+                ">
+                  <div>
+                    <p className="
+                      text-sm
+                      font-black
+                      text-amber-200
+                    ">
+                      Funding required
+                    </p>
+
+                    <p className="
+                      mt-1
+                      text-xs
+                      leading-5
+                      text-amber-100/80
+                    ">
+                      Deposit minimum 1 USDT before activation or access can continue.
+                    </p>
+                  </div>
+
+                  <span className="
+                    rounded-full
+                    border
+                    border-amber-300/20
+                    bg-black/25
+                    px-3
+                    py-1
+                    text-[10px]
+                    font-black
+                    uppercase
+                    tracking-[0.18em]
+                    text-amber-200
+                  ">
+                    USDT
+                  </span>
+                </div>
+
+                <div className="
+                  mt-4
+                  rounded-2xl
+                  border
+                  border-white/10
+                  bg-black/30
+                  p-4
+                ">
+                  <p className="
+                    text-[10px]
+                    font-black
+                    uppercase
+                    tracking-[0.22em]
+                    text-zinc-500
+                  ">
+                    Network
+                  </p>
+
+                  <p className="
+                    mt-1
+                    text-sm
+                    font-black
+                    text-white
+                  ">
+                    {fundingNetwork}
+                  </p>
+
+                  <p className="
+                    mt-4
+                    text-[10px]
+                    font-black
+                    uppercase
+                    tracking-[0.22em]
+                    text-zinc-500
+                  ">
+                    Capsule Wallet
+                  </p>
+
+                  <p className="
+                    mt-2
+                    break-all
+                    rounded-xl
+                    border
+                    border-white/10
+                    bg-black/35
+                    p-3
+                    text-xs
+                    leading-5
+                    text-zinc-200
+                  ">
+                    {fundingWallet}
+                  </p>
+
+                  <div className="
+                    mt-3
+                    grid
+                    gap-3
+                    sm:grid-cols-2
+                  ">
+                    <button
+                      type="button"
+                      onClick={copyFundingWallet}
+                      className="
+                        h-11
+                        rounded-xl
+                        bg-amber-300
+                        text-sm
+                        font-black
+                        text-black
+                        transition
+                        hover:scale-[1.01]
+                      "
+                    >
+                      {copiedWallet
+                        ? "Address copied"
+                        : "Copy address"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={shareFundingWallet}
+                      className="
+                        h-11
+                        rounded-xl
+                        border
+                        border-white/10
+                        bg-white/10
+                        text-sm
+                        font-black
+                        text-white
+                        transition
+                        hover:bg-white/15
+                      "
+                    >
+                      Share / Send
+                    </button>
+                  </div>
+
+                  <div className="
+                    mt-4
+                    flex
+                    justify-center
+                    rounded-2xl
+                    bg-white
+                    p-4
+                  ">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=190x190&data=${encodeURIComponent(
+                        fundingWallet
+                      )}`}
+                      alt="Capsule Wallet QR code"
+                      className="
+                        h-[190px]
+                        w-[190px]
+                      "
+                    />
+                  </div>
+
+                  <p className="
+                    mt-3
+                    text-xs
+                    leading-5
+                    text-amber-100/80
+                  ">
+                    Send only USDT on Arbitrum to this Capsule Wallet. After deposit, press Connect Capsule again.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <p className="
               mt-4
@@ -1201,7 +1729,163 @@ export default function CardConnectWallet() {
         >
           {buttonText}
         </button>
-      </div>
+            </div>
+
+      {showNonIdLogin && (
+        <div className="
+          fixed
+          inset-0
+          z-[999999]
+          flex
+          items-center
+          justify-center
+          bg-black/70
+          backdrop-blur-sm
+        ">
+          <div className="
+            w-full
+            max-w-[420px]
+            rounded-[32px]
+            border
+            border-cyan-400/20
+            bg-[#070A14]
+            p-6
+          ">
+            <h2 className="
+              text-2xl
+              font-black
+              text-white
+            ">
+              Login with non.ID
+            </h2>
+
+            <p className="
+              mt-3
+              text-sm
+              text-zinc-400
+            ">
+              Choose how you want to continue.
+            </p>
+
+            <button
+  type="button"
+  onClick={() => {
+    alert("This Device selected")
+  }}
+  className="
+    mt-6
+    h-14
+    w-full
+    rounded-2xl
+    bg-cyan-300
+    text-black
+    font-black
+  "
+>
+  This Device
+</button>
+
+           <button
+  type="button"
+  onClick={(e) => {
+  e.preventDefault()
+  e.stopPropagation()
+
+  openNonIdQrLogin()
+}}
+  className="
+    mt-3
+    h-14
+    w-full
+    rounded-2xl
+    border
+    border-cyan-400/20
+    bg-cyan-400/10
+    text-cyan-200
+    font-black
+  "
+>
+  Another Device
+</button>
+
+            <button
+              type="button"
+              onClick={() => setShowNonIdLogin(false)}
+              className="
+                mt-4
+                h-12
+                w-full
+                text-zinc-400
+              "
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+            )}
+
+      {showNonIdQr && (
+        <div className="
+          fixed
+          inset-0
+          z-[999999]
+          flex
+          items-center
+          justify-center
+          bg-black/70
+          backdrop-blur-sm
+        ">
+          <div className="
+            w-full
+            max-w-[420px]
+            rounded-[32px]
+            border
+            border-cyan-400/20
+            bg-[#070A14]
+            p-6
+          ">
+            <h2 className="text-2xl font-black text-white">
+              non.ID QR Login
+            </h2>
+
+            <p className="mt-3 text-sm text-zinc-400">
+              Scan this QR code using non.ID on another device.
+            </p>
+
+            <div className="mt-6 flex justify-center rounded-2xl bg-white p-4">
+              <img
+  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+    JSON.stringify({
+      type: "NEXUSNON_NONID_LOGIN",
+      sessionId: nonIdQrSessionId
+    })
+  )}`}
+  alt="non.ID QR"
+  className="h-[220px] w-[220px]"
+/>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowNonIdQr(false)}
+              className="
+                mt-6
+                h-12
+                w-full
+                rounded-xl
+                border
+                border-white/10
+                bg-white/10
+                font-bold
+                text-white
+              "
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
     </main>
   )
 }

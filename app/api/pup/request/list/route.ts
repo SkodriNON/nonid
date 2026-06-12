@@ -8,9 +8,44 @@ export const runtime =
 export const dynamic =
   "force-dynamic"
 
-export async function GET() {
+export async function GET(
+  request: Request
+) {
+  const url =
+    new URL(request.url)
+
+  const wallet =
+    url.searchParams.get("wallet") || ""
+
+  const capsuleId =
+    url.searchParams.get("capsuleId") || ""
+
+  const email =
+    url.searchParams.get("email") || ""
+
+  if (
+    !wallet &&
+    !capsuleId &&
+    !email
+  ) {
+    return Response.json(
+      {
+        success: false,
+        error:
+          "Missing request scope. Provide wallet, capsuleId or email."
+      },
+      {
+        status: 400
+      }
+    )
+  }
+
   const normalized =
-    await listPupRequests()
+    await listPupRequests({
+      wallet,
+      capsuleId,
+      email
+    })
 
   const latestByCapsule =
     new Map<string, any>()

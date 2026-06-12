@@ -1,5 +1,5 @@
 import {
-  getPupRequest
+  getScopedPupRequest
 } from "@/lib/pupRequestStore"
 
 export const runtime =
@@ -19,6 +19,23 @@ export async function GET(
       url.searchParams.get("id") || ""
     ).trim()
 
+  const wallet =
+    String(
+      url.searchParams.get("wallet") || ""
+    ).trim()
+
+  const capsuleId =
+    String(
+      url.searchParams.get("capsuleId") || ""
+    ).trim()
+
+  const email =
+    String(
+      url.searchParams.get("email") || ""
+    )
+      .trim()
+      .toLowerCase()
+
   if (!id) {
     return Response.json(
       {
@@ -32,15 +49,39 @@ export async function GET(
     )
   }
 
+  if (
+    !wallet &&
+    !capsuleId &&
+    !email
+  ) {
+    return Response.json(
+      {
+        success: false,
+        error:
+          "REQUEST_SCOPE_REQUIRED"
+      },
+      {
+        status: 400
+      }
+    )
+  }
+
   const request =
-    await getPupRequest(id)
+    await getScopedPupRequest(
+      id,
+      {
+        wallet,
+        capsuleId,
+        email
+      }
+    )
 
   if (!request) {
     return Response.json(
       {
         success: false,
         error:
-          "REQUEST_NOT_FOUND"
+          "REQUEST_NOT_FOUND_OR_SCOPE_MISMATCH"
       },
       {
         status: 404

@@ -96,7 +96,7 @@ export default function PupRecoveryPage() {
         throw new Error("Phone is missing from Capsule.")
       }
 
-      const response = await fetch("/api/send-otp", {
+      const response = await fetch("/api/send-email-otp", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -114,7 +114,7 @@ export default function PupRecoveryPage() {
       }
 
       setOtpSent(true)
-      setMessage("OTP sent to your registered phone.")
+      setMessage("OTP sent to your registered email.")
     } catch (err: any) {
       setMessage(err?.message || "Could not send OTP.")
     } finally {
@@ -144,7 +144,7 @@ export default function PupRecoveryPage() {
       }
 
       if (!otp.trim() || otp.trim().length !== 6) {
-        throw new Error("Phone OTP is required.")
+        throw new Error("Email OTP is required.")
       }
 
       if (!newPin.trim() || newPin.trim().length < 6) {
@@ -163,7 +163,7 @@ export default function PupRecoveryPage() {
         body: JSON.stringify({
           email: cleanEmail(),
           phone: cleanPhone(),
-          phoneOtp: otp.trim()
+          emailOtp: otp.trim()
         })
       })
 
@@ -283,7 +283,7 @@ export default function PupRecoveryPage() {
           </h1>
 
           <p className="mt-4 text-sm leading-7 text-zinc-400">
-            Email and phone are loaded from your Capsule. Confirm Anti-Phishing, OTP, and new PUP PIN. Recovery requires 1 USDT from your Capsule Wallet.
+            Recovery data is verified against your Capsule Identity. Confirm Anti-Phishing, Email OTP, and new PUP PIN. Recovery requires 1 USDT from your Capsule Wallet.
           </p>
 
           {message && (
@@ -328,7 +328,7 @@ export default function PupRecoveryPage() {
               disabled={loading || !email || !phone}
               className="h-13 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm font-black text-amber-200 transition hover:bg-amber-400/15 disabled:opacity-50"
             >
-              {otpSent ? "Send OTP Again" : "Send Phone OTP"}
+              {otpSent ? "Send OTP Again" : "Send Email OTP"}
             </button>
 
             <input
@@ -338,7 +338,7 @@ export default function PupRecoveryPage() {
                   e.target.value.replace(/\D/g, "").slice(0, 6)
                 )
               }
-              placeholder="Phone OTP"
+              placeholder="Email OTP"
               inputMode="numeric"
               maxLength={6}
               className="h-14 rounded-2xl border border-white/10 bg-black/30 px-4 text-sm text-white outline-none placeholder:text-zinc-600"
