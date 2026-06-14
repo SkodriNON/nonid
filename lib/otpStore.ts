@@ -7,11 +7,15 @@ export type OtpData = {
   email?: string
 }
 
-const UPSTASH_REDIS_REST_URL =
-  process.env.UPSTASH_REDIS_REST_URL || ""
+const KV_REST_API_URL =
+  process.env.UPSTASH_REDIS_REST_URL ||
+  process.env.KV_REST_API_URL ||
+  ""
 
-const UPSTASH_REDIS_REST_TOKEN =
-  process.env.UPSTASH_REDIS_REST_TOKEN || ""
+const KV_REST_API_TOKEN =
+  process.env.UPSTASH_REDIS_REST_TOKEN ||
+  process.env.KV_REST_API_TOKEN ||
+  ""
 
 const globalForOtp = globalThis as unknown as {
   nexusOtpStore?: Map<string, OtpData>
@@ -24,37 +28,78 @@ const memoryStore =
 globalForOtp.nexusOtpStore = memoryStore
 
 function redisEnabled() {
-  return Boolean(
-    UPSTASH_REDIS_REST_URL &&
-      UPSTASH_REDIS_REST_TOKEN
-  )
+  return Boolean(KV_REST_API_URL && KV_REST_API_TOKEN)
 }
 
 function redisKey(key: string) {
   return `nexusnon:otp:${key}`
 }
 
-async function redisCommand(args: string[]) {
-  if (!redisEnabled()) {
-    throw new Error("UPSTASH_REDIS_NOT_CONFIGURED")
-  }
-
-  const res = await fetch(UPSTASH_REDIS_REST_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(args),
-    cache: "no-store",
-  })
+async function kvGet(key: string) {
+  const res = await fetch(
+    `${KV_REST_API_URL}/get/${encodeURIComponent(redisKey(key))}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${KV_REST_API_TOKEN}`,
+      },
+      cache: "no-store",
+    }
+  )
 
   const data = await res.json()
 
   if (!res.ok || data?.error) {
-    throw new Error(
-      data?.error || "UPSTASH_REDIS_COMMAND_FAILED"
-    )
+    throw new Error(data?.error || "KV_GET_FAILED")
+  }
+
+  return data?.result || null
+}
+
+async function kvSet(key: string, value: OtpData) {
+  const ttlSeconds = Math.max(
+    1,
+    Math.ceil((value.expires - Date.now()) / 1000)
+  )
+
+  const res = await fetch(
+    `${KV_REST_API_URL}/set/${encodeURIComponent(redisKey(key))}/${encodeURIComponent(
+      JSON.stringify(value)
+    )}?EX=${ttlSeconds}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${KV_REST_API_TOKEN}`,
+      },
+      cache: "no-store",
+    }
+  )
+
+  const data = await res.json()
+
+  if (!res.ok || data?.error) {
+    throw new Error(data?.error || "KV_SET_FAILED")
+  }
+
+  return data?.result
+}
+
+async function kvDelete(key: string) {
+  const res = await fetch(
+    `${KV_REST_API_URL}/del/${encodeURIComponent(redisKey(key))}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${KV_REST_API_TOKEN}`,
+      },
+      cache: "no-store",
+    }
+  )
+
+  const data = await res.json()
+
+  if (!res.ok || data?.error) {
+    throw new Error(data?.error || "KV_DELETE_FAILED")
   }
 
   return data?.result
@@ -66,15 +111,14 @@ export const otpStore = {
       return memoryStore.get(key)
     }
 
-    const raw = await redisCommand([
-      "GET",
-      redisKey(key),
-    ])
+    const raw = await kvGet(key)
 
     if (!raw) return undefined
 
     try {
-      return JSON.parse(raw) as OtpData
+      return typeof raw === "string"
+        ? (JSON.parse(raw) as OtpData)
+        : (raw as OtpData)
     } catch {
       return undefined
     }
@@ -86,20 +130,7 @@ export const otpStore = {
       return
     }
 
-    const ttlSeconds = Math.max(
-      1,
-      Math.ceil(
-        (value.expires - Date.now()) / 1000
-      )
-    )
-
-    await redisCommand([
-      "SET",
-      redisKey(key),
-      JSON.stringify(value),
-      "EX",
-      String(ttlSeconds),
-    ])
+    await kvSet(key, value)
   },
 
   async delete(key: string) {
@@ -108,9 +139,6 @@ export const otpStore = {
       return
     }
 
-    await redisCommand([
-      "DEL",
-      redisKey(key),
-    ])
+    await kvDelete(key)
   },
 }
