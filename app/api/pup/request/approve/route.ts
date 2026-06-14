@@ -1,95 +1,79 @@
-import {
-  approvePupRequest
-} from "@/lib/pupRequestStore"
+import { approvePupRequest } from "@/lib/pupRequestStore"
 
-import {
-  voteBusinessCapsuleRequest
-} from "@/lib/businessCapsuleStore"
+import { voteBusinessCapsuleRequest } from "@/lib/businessCapsuleStore"
 
-export const runtime =
-  "nodejs"
+export const runtime = "nodejs"
 
-export const dynamic =
-  "force-dynamic"
+export const dynamic = "force-dynamic"
 
-export async function POST(
-  req: Request
-) {
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders,
+  })
+}
+
+function jsonResponse(data: any, status = 200) {
+  return Response.json(data, {
+    status,
+    headers: corsHeaders,
+  })
+}
+
+export async function POST(req: Request) {
   try {
-    const body =
-      await req.json()
+    const body = await req.json()
 
-    const id =
-      String(
-        body.id ||
+    const id = String(
+      body.id ||
         body.requestId ||
         body.pupRequestId ||
         ""
-      ).trim()
+    ).trim()
 
-    const wallet =
-      String(body.wallet || "")
-        .trim()
-
-    const capsuleId =
-      String(body.capsuleId || "")
-        .trim()
-
-    const email =
-      String(body.email || "")
-        .trim()
-        .toLowerCase()
+    const wallet = String(body.wallet || "").trim().toLowerCase()
+    const capsuleId = String(body.capsuleId || "").trim()
+    const email = String(body.email || "").trim().toLowerCase()
 
     if (!id) {
-      return Response.json(
+      return jsonResponse(
         {
           success: false,
-          error:
-            "REQUEST_ID_REQUIRED"
+          error: "REQUEST_ID_REQUIRED",
         },
-        {
-          status: 400
-        }
+        400
       )
     }
 
-    if (
-      !wallet &&
-      !capsuleId &&
-      !email
-    ) {
-      return Response.json(
+    if (!wallet && !capsuleId && !email) {
+      return jsonResponse(
         {
           success: false,
-          error:
-            "REQUEST_SCOPE_REQUIRED"
+          error: "REQUEST_SCOPE_REQUIRED",
         },
-        {
-          status: 400
-        }
+        400
       )
     }
 
-    const request =
-      await approvePupRequest(
-        id,
-        {
-          wallet,
-          capsuleId,
-          email
-        }
-      )
+    const request = await approvePupRequest(id, {
+      wallet,
+      capsuleId,
+      email,
+    })
 
     if (!request) {
-      return Response.json(
+      return jsonResponse(
         {
           success: false,
-          error:
-            "REQUEST_NOT_FOUND_OR_SCOPE_MISMATCH"
+          error: "REQUEST_NOT_FOUND_OR_SCOPE_MISMATCH",
         },
-        {
-          status: 404
-        }
+        404
       )
     }
 
@@ -97,48 +81,32 @@ export async function POST(
 
     if (
       request.status === "approved" &&
-      String(request.action || "").startsWith(
-        "BUSINESS_CAPSULE_APPROVAL:"
-      )
+      String(request.action || "").startsWith("BUSINESS_CAPSULE_APPROVAL:")
     ) {
-      const businessRequestId =
-        String(request.action)
-          .replace(
-            "BUSINESS_CAPSULE_APPROVAL:",
-            ""
-          )
-          .trim()
+      const businessRequestId = String(request.action)
+        .replace("BUSINESS_CAPSULE_APPROVAL:", "")
+        .trim()
 
-      businessVote =
-        await voteBusinessCapsuleRequest({
-          requestId:
-            businessRequestId,
-          signerWallet:
-            request.wallet,
-          approve:
-            true
-        })
+      businessVote = await voteBusinessCapsuleRequest({
+        requestId: businessRequestId,
+        signerWallet: request.wallet,
+        approve: true,
+      })
     }
 
-    return Response.json({
+    return jsonResponse({
       success: true,
-      approved:
-        request.status === "approved",
+      approved: request.status === "approved",
       request,
-      businessVote
+      businessVote,
     })
-
   } catch (err: any) {
-    return Response.json(
+    return jsonResponse(
       {
         success: false,
-        error:
-          err?.message ||
-          "PUP_APPROVE_FAILED"
+        error: err?.message || "PUP_APPROVE_FAILED",
       },
-      {
-        status: 500
-      }
+      500
     )
   }
 }
