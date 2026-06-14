@@ -1,85 +1,70 @@
-import {
-  listPupRequests
-} from "@/lib/pupRequestStore"
+﻿import { listPupRequests } from "@/lib/pupRequestStore"
 
-export const runtime =
-  "nodejs"
+export const runtime = "nodejs"
 
-export const dynamic =
-  "force-dynamic"
+export const dynamic = "force-dynamic"
 
-export async function GET(
-  request: Request
-) {
-  const url =
-    new URL(request.url)
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+}
 
-  const wallet =
-    url.searchParams.get("wallet") || ""
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders,
+  })
+}
 
-  const capsuleId =
-    url.searchParams.get("capsuleId") || ""
+function jsonResponse(data: any, status = 200) {
+  return Response.json(data, {
+    status,
+    headers: corsHeaders,
+  })
+}
 
-  const email =
-    url.searchParams.get("email") || ""
+export async function GET(request: Request) {
+  const url = new URL(request.url)
 
-  if (
-    !wallet &&
-    !capsuleId &&
-    !email
-  ) {
-    return Response.json(
+  const wallet = url.searchParams.get("wallet") || ""
+  const capsuleId = url.searchParams.get("capsuleId") || ""
+  const email = url.searchParams.get("email") || ""
+
+  if (!wallet && !capsuleId && !email) {
+    return jsonResponse(
       {
         success: false,
-        error:
-          "Missing request scope. Provide wallet, capsuleId or email."
+        error: "Missing request scope. Provide wallet, capsuleId or email.",
       },
-      {
-        status: 400
-      }
+      400
     )
   }
 
-  const normalized =
-    await listPupRequests({
-      wallet,
-      capsuleId,
-      email
-    })
+  const normalized = await listPupRequests({
+    wallet,
+    capsuleId,
+    email,
+  })
 
-  const latestByCapsule =
-    new Map<string, any>()
+  const latestByCapsule = new Map<string, any>()
 
   for (const request of normalized) {
-    const key =
-      `${request.capsuleId}:${request.wallet}:${request.action}`
+    const key = `${request.capsuleId}:${request.wallet}:${request.action}`
 
-    const existing =
-      latestByCapsule.get(key)
+    const existing = latestByCapsule.get(key)
 
-    if (
-      !existing ||
-      request.createdAt >
-        existing.createdAt
-    ) {
-      latestByCapsule.set(
-        key,
-        request
-      )
+    if (!existing || request.createdAt > existing.createdAt) {
+      latestByCapsule.set(key, request)
     }
   }
 
-  const requests =
-    Array.from(
-      latestByCapsule.values()
-    ).sort(
-      (a, b) =>
-        b.createdAt -
-        a.createdAt
-    )
+  const requests = Array.from(latestByCapsule.values()).sort(
+    (a, b) => b.createdAt - a.createdAt
+  )
 
-  return Response.json({
+  return jsonResponse({
     success: true,
-    requests
+    requests,
   })
 }
