@@ -81,7 +81,7 @@ export async function POST(req: Request) {
 
     const key = phone ? `${phone}:${email}` : email
 
-    const existing = otpStore.get(key)
+    const existing = await otpStore.get(key)
 
     if (
       existing?.emailOtp &&
@@ -101,7 +101,7 @@ export async function POST(req: Request) {
 
     const emailOtp = generateOtp()
 
-    otpStore.set(key, {
+    await otpStore.set(key, {
       phoneOtp: existing?.phoneOtp || "",
       emailOtp,
       expires: Date.now() + 5 * 60 * 1000,

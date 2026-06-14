@@ -75,7 +75,7 @@ export async function POST(req: Request) {
     let usedKey = ""
 
     for (const key of keys) {
-      const found = otpStore.get(key)
+      const found = await otpStore.get(key)
 
       if (found) {
         session = found
@@ -104,7 +104,7 @@ export async function POST(req: Request) {
     }
 
     if (Date.now() > session.expires) {
-      otpStore.delete(usedKey)
+      await otpStore.delete(usedKey)
 
       return jsonResponse({
         success: false,
@@ -125,7 +125,7 @@ export async function POST(req: Request) {
       })
     }
 
-    otpStore.delete(usedKey)
+    await otpStore.delete(usedKey)
 
     return jsonResponse({
       success: true,
