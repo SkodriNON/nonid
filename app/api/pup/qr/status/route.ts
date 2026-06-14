@@ -1,78 +1,84 @@
 import {
   getNonIdQrSession,
-  updateNonIdQrSession
+  updateNonIdQrSession,
 } from "../_store"
 
-import {
-  getPupRequest
-} from "@/lib/pupRequestStore"
+import { getPupRequest } from "@/lib/pupRequestStore"
 
-export const runtime =
-  "nodejs"
+export const runtime = "nodejs"
 
-export const dynamic =
-  "force-dynamic"
+export const dynamic = "force-dynamic"
 
-export async function GET(
-  req: Request
-) {
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders,
+  })
+}
+
+function jsonResponse(data: any, status = 200) {
+  return Response.json(data, {
+    status,
+    headers: corsHeaders,
+  })
+}
+
+export async function GET(req: Request) {
   try {
-    const url =
-      new URL(req.url)
+    const url = new URL(req.url)
 
-    const id =
-      String(
-        url.searchParams.get("id") || ""
-      ).trim()
+    const id = String(
+      url.searchParams.get("id") ||
+        url.searchParams.get("sessionId") ||
+        url.searchParams.get("qrId") ||
+        ""
+    ).trim()
 
     if (!id) {
-      return Response.json(
+      return jsonResponse(
         {
           success: false,
-          error: "QR_SESSION_ID_REQUIRED"
+          error: "QR_SESSION_ID_REQUIRED",
         },
-        {
-          status: 400
-        }
+        400
       )
     }
 
-    const session =
-      await getNonIdQrSession(id)
+    const session = await getNonIdQrSession(id)
 
     if (!session) {
-      return Response.json(
+      return jsonResponse(
         {
           success: false,
-          error: "QR_SESSION_NOT_FOUND"
+          error: "QR_SESSION_NOT_FOUND",
         },
-        {
-          status: 404
-        }
+        404
       )
     }
 
     if (!session.requestId) {
-      return Response.json({
+      return jsonResponse({
         success: true,
-        session
+        session,
       })
     }
 
-    const request =
-      await getPupRequest(
-        session.requestId
-      )
+    const request = await getPupRequest(session.requestId)
 
     if (!request) {
-      return Response.json({
+      return jsonResponse({
         success: true,
-        session
+        session,
       })
     }
 
-    let nextStatus =
-      session.status
+    let nextStatus = session.status
 
     if (request.status === "approved") {
       nextStatus = "approved"
@@ -88,30 +94,23 @@ export async function GET(
 
     const updated =
       nextStatus !== session.status
-        ? await updateNonIdQrSession(
-            session.id,
-            {
-              status: nextStatus
-            }
-          )
+        ? await updateNonIdQrSession(session.id, {
+            status: nextStatus,
+          })
         : session
 
-    return Response.json({
+    return jsonResponse({
       success: true,
       session: updated,
-      request
+      request,
     })
   } catch (err: any) {
-    return Response.json(
+    return jsonResponse(
       {
         success: false,
-        error:
-          err?.message ||
-          "NONID_QR_STATUS_FAILED"
+        error: err?.message || "NONID_QR_STATUS_FAILED",
       },
-      {
-        status: 500
-      }
+      500
     )
   }
 }
