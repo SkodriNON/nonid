@@ -267,13 +267,10 @@ setRequests(
   }
 
   function isLocalSetupRequest(
-    request: PupRequest
-  ) {
-    return (
-      !isActivationRequest(request) &&
-      !hasPupPassword(request.capsuleId)
-    )
-  }
+  request: PupRequest
+) {
+  return false
+}
 
   function resetSecrets() {
     setPupPassword("")

@@ -90,6 +90,12 @@ export default function CardConnectWallet() {
 const [nonIdQrLoading, setNonIdQrLoading] =
   useState(false)
 
+  const [showThisDeviceFallback, setShowThisDeviceFallback] =
+  useState(false)
+
+const [thisDeviceSessionId, setThisDeviceSessionId] =
+  useState("")
+
   const [loading, setLoading] =
     useState(false)
 
@@ -1061,7 +1067,45 @@ await createPupLoginRequest(
       2500
     )
 }
+async function openNonIdThisDeviceLogin() {
+  try {
+    setShowNonIdLogin(false)
+    setShowThisDeviceFallback(false)
 
+    const response = await fetch("/api/pup/qr/create", {
+      method: "POST",
+      cache: "no-store"
+    })
+
+    const data = await readJsonSafe(response)
+
+    if (!response.ok || data.success !== true) {
+      throw new Error(data.error || "LOGIN_REQUEST_CREATE_FAILED")
+    }
+
+    const sessionId = String(
+      data?.session?.id ||
+      data?.qr?.sessionId ||
+      ""
+    )
+
+    if (!sessionId) {
+      throw new Error("LOGIN_SESSION_MISSING")
+    }
+
+    setNonIdQrSessionId(sessionId)
+    startNonIdQrWatcher(sessionId)
+
+  window.location.href =
+  `nexuspup://?sessionId=${encodeURIComponent(sessionId)}&mode=this_device`
+
+    setTimeout(() => {
+      setShowThisDeviceFallback(true)
+    }, 1800)
+  } catch (err: any) {
+    alert(err?.message || "Could not start non.ID login.")
+  }
+}
   return (
     <main className="
       flex
@@ -1376,25 +1420,26 @@ await createPupLoginRequest(
                   "us"
                 ]}
                 countrySelectorStyleProps={{
-                  buttonClassName:
-                    flowStep !== "form"
-                      ? "!border-0 !bg-transparent !cursor-not-allowed"
-                      : "!border-0 !bg-transparent hover:!bg-white/5",
+  buttonClassName:
+    flowStep !== "form"
+      ? "!h-14 !min-w-[118px] !border-0 !bg-transparent !cursor-not-allowed !text-white"
+      : "!h-14 !min-w-[118px] !border-0 !bg-transparent !text-white hover:!bg-white/5",
 
-                  dropdownStyleProps: {
-                    className:
-                      "!bg-[#0B1120] !border !border-white/10 !text-white !rounded-[24px] !shadow-2xl",
+  dropdownStyleProps: {
+    className:
+      "!fixed !left-4 !right-4 !top-[110px] !z-[999999999] !max-w-[calc(100vw-32px)] !bg-[#0B1120] !border !border-white/10 !text-white !rounded-[24px] !shadow-2xl",
 
-                    listItemClassName:
-                      "!text-white hover:!bg-white/5",
+    listItemClassName:
+      "!min-h-14 !text-white hover:!bg-white/5",
 
-                    style: {
-                      maxHeight: "420px",
-                      overflowY: "auto",
-                      width: "340px"
-                    }
-                  }
-                }}
+    style: {
+      maxHeight: "70vh",
+      overflowY: "auto",
+      WebkitOverflowScrolling: "touch",
+      width: "calc(100vw - 32px)"
+    }
+  }
+}}
                 inputClassName="
                   !h-14
                   !w-full
@@ -1769,9 +1814,7 @@ await createPupLoginRequest(
 
             <button
   type="button"
-  onClick={() => {
-    alert("This Device selected")
-  }}
+  onClick={openNonIdThisDeviceLogin}
   className="
     mt-6
     h-14
