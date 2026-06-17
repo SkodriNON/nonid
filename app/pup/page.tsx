@@ -1604,7 +1604,7 @@ if (
                 {[
                   ["Capsule", "Identity"],
                   ["Genesis", "Source of Truth"],
-                  ["PUP", "Approval Layer"],
+                  ["non.ID", "Approval Layer"],
                   ["Active Login", "Password Required"],
                   ["First Activation", "Anti-Phishing Required"],
                   ["Recovery", "Fee Required Again"]

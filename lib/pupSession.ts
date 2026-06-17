@@ -2,7 +2,7 @@ export type PupSession = {
   active: true
   capsuleId: string
   wallet: string
-  type: "PUP"
+  type: "non.ID"
   createdAt: number
   expiresAt: number
 }
@@ -40,7 +40,7 @@ export function createPupSession(
     wallet:
       normalizeWallet(wallet),
     type:
-      "PUP",
+      "non.ID",
     createdAt:
       now(),
     expiresAt:
@@ -75,7 +75,7 @@ export function getPupSession():
     if (
       !session ||
       session.active !== true ||
-      session.type !== "PUP" ||
+      session.type !== "non.ID" ||
       !session.capsuleId ||
       !session.wallet ||
       !session.expiresAt

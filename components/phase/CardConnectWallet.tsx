@@ -1426,31 +1426,31 @@ async function openNonIdThisDeviceLogin() {
       : "!h-14 !min-w-[118px] !border-0 !bg-transparent !text-white hover:!bg-white/5",
 
   dropdownStyleProps: {
-    className:
-      "!fixed !left-4 !right-4 !top-[110px] !z-[999999999] !max-w-[calc(100vw-32px)] !bg-[#0B1120] !border !border-white/10 !text-white !rounded-[24px] !shadow-2xl",
+  className:
+    "!relative !mt-3 !z-[20] !w-full !bg-[#0B1120] !border !border-cyan-400/30 !text-white !rounded-[20px] !shadow-2xl",
 
-    listItemClassName:
-      "!min-h-14 !text-white hover:!bg-white/5",
+  listItemClassName:
+    "!min-h-14 !text-white hover:!bg-white/5",
 
-    style: {
-      maxHeight: "70vh",
-      overflowY: "auto",
-      WebkitOverflowScrolling: "touch",
-      width: "calc(100vw - 32px)"
-    }
+  style: {
+    maxHeight: "260px",
+    overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
+    width: "100%"
   }
+}
 }}
-                inputClassName="
-                  !h-14
-                  !w-full
-                  !border-0
-                  !bg-transparent
-                  !text-sm
-                  !font-semibold
-                  !text-white
-                  placeholder:!text-zinc-600
-                  focus:!ring-0
-                "
+ inputClassName="
+  !h-14
+  !w-full
+  !border-0
+  !bg-transparent
+  !text-sm
+  !font-semibold
+  !text-white
+  placeholder:!text-zinc-600
+  focus:!ring-0
+"
               />
             </div>
 

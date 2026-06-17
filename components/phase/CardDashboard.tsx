@@ -637,10 +637,10 @@ export default function CardDashboard() {
       sub: "Funds and owner"
     },
     {
-      id: "pup",
-      title: "PUP",
-      sub: "Passport layer"
-    },
+  id: "pup",
+  title: "non.ID",
+  sub: "Approval layer"
+},
     {
       id: "privacy",
       title: "Privacy",
@@ -664,14 +664,14 @@ export default function CardDashboard() {
   ]
 
   return (
-    <main className="min-h-screen bg-[#03040A] px-4 py-6 text-white sm:px-6 lg:px-8">
+    <main className="min-h-screen overflow-x-hidden bg-[#03040A] px-3 py-4 pb-28 text-white sm:px-6 sm:py-6 lg:px-8">
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute left-[20%] top-[-10%] h-[520px] w-[520px] rounded-full bg-cyan-400/10 blur-[160px]" />
         <div className="absolute bottom-[-20%] right-[-10%] h-[560px] w-[560px] rounded-full bg-violet-600/10 blur-[170px]" />
       </div>
 
-      <section className="relative mx-auto grid max-w-[1500px] gap-6 lg:grid-cols-[310px_1fr]">
-        <aside className="rounded-[34px] border border-white/10 bg-white/[0.035] p-4 backdrop-blur-xl lg:sticky lg:top-6 lg:h-[calc(100vh-48px)]">
+      <section className="relative mx-auto grid w-full max-w-[1500px] gap-4 lg:grid-cols-[310px_1fr] lg:gap-6">
+       <aside className="rounded-[28px] border border-white/10 bg-white/[0.035] p-3 backdrop-blur-xl sm:p-4 lg:sticky lg:top-6 lg:h-[calc(100vh-48px)]">
           <div className="rounded-[28px] border border-cyan-400/20 bg-cyan-400/[0.06] p-5">
             <p className="text-xs font-black uppercase tracking-[0.35em] text-cyan-300">
               NEXUSNON.ID
@@ -724,7 +724,7 @@ export default function CardDashboard() {
           </button>
         </aside>
 
-        <section className="min-h-[calc(100vh-48px)] rounded-[38px] border border-white/10 bg-white/[0.025] p-5 backdrop-blur-xl sm:p-7">
+        <section className="min-h-[calc(100vh-48px)] w-full overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.025] p-3 backdrop-blur-xl sm:rounded-[38px] sm:p-7">
           {error && (
             <div className="mb-5 rounded-[24px] border border-red-400/20 bg-red-400/10 p-5 text-sm text-red-300">
               {error}
@@ -744,12 +744,12 @@ export default function CardDashboard() {
                       Overview
                     </p>
 
-                    <h2 className="mt-4 text-5xl font-black">
+                    <h2 className="mt-4 break-words text-3xl font-black sm:text-5xl">
                       {capsuleName}
                     </h2>
 
                     <p className="mt-4 max-w-3xl text-sm leading-7 text-zinc-400">
-                      Capsule is the identity. PUP is the passport approval layer.
+                      Capsule is the identity. non.ID is the approval layer.
                       Genesis Contract is the source of truth.
                     </p>
 
@@ -765,7 +765,7 @@ export default function CardDashboard() {
                       />
 
                       <StatBox
-                        label="PUP Session"
+                        label="non.ID Session"
                         value={pupSessionActive ? "Active" : "Locked"}
                       />
                     </div>
@@ -861,18 +861,18 @@ export default function CardDashboard() {
               {tab === "pup" && (
                 <div className="grid gap-6">
                   <PanelTitle
-                    title="PUP Passport"
-                    desc="PUP is the approval and session layer. It is not the identity."
+                    title="non.ID"
+desc="non.ID is the approval and session layer. It is not the identity."
                   />
 
                   <div className="rounded-[34px] border border-violet-400/20 bg-violet-400/[0.06] p-6">
-                    <p className="text-5xl font-black text-violet-200">
-                      {pupPassport?.pupId || `PUP-NON-${capsuleId}`}
+                    <p className="break-words text-3xl font-black text-violet-200 sm:text-5xl">
+                      {pupPassport?.pupId?.replace("PUP", "non.ID") || `non.ID-${capsuleId}`}
                     </p>
 
                     <div className="mt-6 grid gap-4 md:grid-cols-2">
                       <InfoRow label="Session" value={pupSessionActive ? "Active" : "Locked"} accent={pupSessionActive} />
-                      <InfoRow label="Layer" value="Passport / Approval" />
+                      <InfoRow label="Layer" value="Approval Layer" />
                       <InfoRow label="Role" value={pupPassport?.role || "Sovereign Citizen"} />
                       <InfoRow label="Capsule" value={`#${capsuleId}`} />
                     </div>
@@ -992,7 +992,7 @@ export default function CardDashboard() {
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <InfoRow label="Capsule" value="Identity" accent />
-                    <InfoRow label="PUP" value="Passport Layer" accent />
+                    <InfoRow label="non.ID" value="Approval Layer" accent />
                     <InfoRow label="Genesis" value="Source of Truth" accent />
                     <InfoRow label="Browser Storage" value="Not Identity Source" />
                     <InfoRow label="Database Identity" value="Disabled" />
