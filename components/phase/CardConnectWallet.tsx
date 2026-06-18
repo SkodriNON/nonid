@@ -1297,14 +1297,27 @@ async function openNonIdThisDeviceLogin() {
               <input
                 value={email}
                 onChange={(e) => {
-                  setEmail(
-                    e.target.value
-                  )
+  const value = e.target.value
 
-                  setShowEmailProviders(
-                    e.target.value.includes("@")
-                  )
-                }}
+  setEmail(value)
+
+  const afterAt = value.includes("@")
+    ? value.split("@").pop()?.toLowerCase() || ""
+    : ""
+
+  const hasProviderMatch =
+    value.includes("@") &&
+    emailProviders.some((provider) =>
+      provider
+        .replace("@", "")
+        .toLowerCase()
+        .startsWith(afterAt)
+    )
+
+  setShowEmailProviders(
+    hasProviderMatch
+  )
+}}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     phoneRef.current?.focus()
@@ -1335,12 +1348,11 @@ async function openNonIdThisDeviceLogin() {
               />
 
               {showEmailProviders && flowStep === "form" && (
-                <div className="
-                  absolute
-                  left-0
-                  top-[72px]
-                  z-[999999]
-                  w-full
+  <div className="
+    relative
+    mt-3
+    z-[20]
+    w-full
                   overflow-hidden
                   rounded-[20px]
                   border
@@ -1349,8 +1361,17 @@ async function openNonIdThisDeviceLogin() {
                   shadow-2xl
                   backdrop-blur-xl
                 ">
-                  {emailProviders.map(
-                    (provider) => (
+                  {emailProviders
+  .filter((provider) => {
+    const afterAt =
+      email.split("@").pop()?.toLowerCase() || ""
+
+    return provider
+      .replace("@", "")
+      .toLowerCase()
+      .startsWith(afterAt)
+  })
+  .map((provider) => (
                       <button
                         key={provider}
                         type="button"
